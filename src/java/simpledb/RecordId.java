@@ -52,7 +52,7 @@ public class RecordId implements Serializable {
     public boolean equals(Object o) {
         // some code goes here
         if (o == null) {
-            throw new UnsupportedOperationException();
+            return false;
         }
         if (o == this) {
             return true;

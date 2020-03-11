@@ -206,6 +206,9 @@ public class TupleDesc implements Serializable {
 
     public boolean equals(Object o) {
         // some code goes here
+        if (o == null) {
+            return false;
+        }
         if (this == o) {
             return true;
         }
