@@ -1,9 +1,7 @@
 package simpledb;
 
 import java.io.Serializable;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 
 /**
  * Tuple maintains information about the contents of a tuple. Tuples have a
@@ -11,7 +9,6 @@ import java.util.List;
  * with the data for each field.
  */
 public class Tuple implements Serializable {
-
     private TupleDesc tupleDesc;
     private Field[] fields;
     private RecordId recordId;
@@ -64,10 +61,10 @@ public class Tuple implements Serializable {
      */
     public void setField(int i, Field f) {
         // some code goes here
-        if (i < 0 || i > fields.length) {
+        if (i < 0 || i >= fields.length) {
             throw new IllegalArgumentException();
         }
-        fields[i] = f;
+        this.fields[i] = f;
     }
 
     /**
@@ -76,7 +73,7 @@ public class Tuple implements Serializable {
      */
     public Field getField(int i) {
         // some code goes here
-        if (i < 0 || i > fields.length) {
+        if (i < 0 || i >= fields.length) {
             throw new IllegalArgumentException();
         }
         return fields[i];
@@ -92,7 +89,12 @@ public class Tuple implements Serializable {
      */
     public String toString() {
         // some code goes here
-        throw new UnsupportedOperationException("Implement this");
+        StringBuffer string = new StringBuffer();
+        for (int i = 0; i < fields.length; i++) {
+            string.append(fields[i].toString());
+            string.append("\t");
+        }
+        return string.toString();
     }
 
     /**
@@ -100,7 +102,23 @@ public class Tuple implements Serializable {
      */
     public Iterator<Field> fields() {
         // some code goes here
-        return null;
+        if (fields.length >= 0) {
+            return new Iterator<Field>() {
+                private int index = 0;
+
+                @Override
+                public boolean hasNext() {
+                    return index < fields.length;
+                }
+
+                @Override
+                public Field next() {
+                    int num = index;
+                    index++;
+                    return fields[num];
+                }
+            };
+        } else return null;
     }
 
     /**
