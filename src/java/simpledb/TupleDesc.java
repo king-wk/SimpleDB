@@ -53,9 +53,10 @@ public class TupleDesc implements Serializable {
 
                 @Override
                 public TDItem next() {
-                    int num = index;
-                    index++;
-                    return items.get(num);
+                    if (!hasNext()) {
+                        throw new NoSuchElementException();
+                    }
+                    return items.get(index++);
                 }
             };
         } else return null;

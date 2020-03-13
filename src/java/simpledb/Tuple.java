@@ -113,9 +113,10 @@ public class Tuple implements Serializable {
 
                 @Override
                 public Field next() {
-                    int num = index;
-                    index++;
-                    return fields[num];
+                    if (!hasNext()) {
+                        throw new NoSuchElementException();
+                    }
+                    return fields[index++];
                 }
             };
         } else return null;
