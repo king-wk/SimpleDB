@@ -70,11 +70,7 @@ public class HeapPage implements Page {
      */
     private int getNumTuples() {
         // some code goes here
-        if (numSlots != 0) {
-            return numSlots;
-        }
-        numSlots = (int) Math.floor((BufferPool.DEFAULT_PAGE_SIZE * 8.0) / (td.getSize() * 8 + 1));
-        return numSlots;
+        return (int) Math.floor((BufferPool.DEFAULT_PAGE_SIZE * 8.0) / (td.getSize() * 8 + 1));
     }
 
     /**
@@ -85,7 +81,6 @@ public class HeapPage implements Page {
     private int getHeaderSize() {
         // some code goes here
         return (int) Math.ceil(getNumTuples() / 8.0);
-
     }
 
     /**
@@ -305,15 +300,12 @@ public class HeapPage implements Page {
      */
     public boolean isSlotUsed(int i) {
         // some code goes here
-        if (i < 0 || i >= numSlots) {
+        if (i < 0 || i > getNumTuples() || i / 8 >= header.length) {
             return false;
         }
-        int posByte = i % 8;
-        int byteNum = i / 8;
-        if (byteNum >= header.length || byteNum < 0) {
-            return false;
-        }
-        return ((header[byteNum] >> posByte) % 2 == 1);
+        int byteNum = header[i / 8] >= 0 ? header[i / 8] : header[i / 8] + 256;
+        int posNum = (int) Math.pow(2, i % 8);
+        return (byteNum / posNum) % 2 == 1;
     }
 
     /**
@@ -336,7 +328,7 @@ public class HeapPage implements Page {
 
             @Override
             public boolean hasNext() {
-                return index < getNumTuples() && (pos < getNumTuples() - getNumEmptySlots());
+                return (index < getNumTuples() && (pos < getNumTuples() - getNumEmptySlots()));
             }
 
             @Override
@@ -344,7 +336,7 @@ public class HeapPage implements Page {
                 if (!hasNext()) {
                     throw new NoSuchElementException();
                 }
-                for (; !isSlotUsed(index); ) {
+                while (!isSlotUsed(index)) {
                     index++;
                 }
                 pos++;
