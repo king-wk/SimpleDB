@@ -72,7 +72,7 @@ public class RecordId implements Serializable {
     @Override
     public int hashCode() {
         // some code goes here
-        return 31 * pageId.hashCode() + tupleNum;
+        return 8 * pageId.hashCode() + tupleNum;
         //throw new UnsupportedOperationException("implement this");
     }
 

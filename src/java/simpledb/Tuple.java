@@ -23,7 +23,7 @@ public class Tuple implements Serializable {
     public Tuple(TupleDesc td) {
         // some code goes here
         this.tupleDesc = td;
-        fields = new Field[td.numFields()];
+        fields = new Field[td.numFields()];//初始化fields数组
     }
 
     /**
@@ -61,7 +61,7 @@ public class Tuple implements Serializable {
      */
     public void setField(int i, Field f) {
         // some code goes here
-        if (i < 0 || i >= fields.length) {
+        if (i < 0 || i >= fields.length) {//如果索引值不合法抛出异常
             throw new IllegalArgumentException();
         }
         this.fields[i] = f;
@@ -73,7 +73,7 @@ public class Tuple implements Serializable {
      */
     public Field getField(int i) {
         // some code goes here
-        if (i < 0 || i >= fields.length) {
+        if (i < 0 || i >= fields.length) {//如果索引值不合法抛出异常
             throw new IllegalArgumentException();
         }
         return fields[i];

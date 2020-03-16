@@ -13,13 +13,13 @@ import java.io.*;
  */
 public class HeapPage implements Page {
 
-    final HeapPageId pid;
-    final TupleDesc td;
-    final byte header[];
-    final Tuple tuples[];
+    private final HeapPageId pid;
+    private final TupleDesc td;
+    private final byte header[];
+    private final Tuple tuples[];
     private int numSlots;
 
-    byte[] oldData;
+    private byte[] oldData;
     private final Byte oldDataLock = new Byte((byte) 0);
 
     /**
@@ -288,7 +288,7 @@ public class HeapPage implements Page {
         // some code goes here
         int emptySlots = 0;
         for (int i = 0; i < getNumTuples(); i++) {
-            if (!isSlotUsed(i)) {
+            if (!isSlotUsed(i)) {//如果没有使用过，则emptySlot加1
                 emptySlots++;
             }
         }
@@ -303,9 +303,11 @@ public class HeapPage implements Page {
         if (i < 0 || i > getNumTuples() || i / 8 >= header.length) {
             return false;
         }
-        int byteNum = header[i / 8] >= 0 ? header[i / 8] : header[i / 8] + 256;
-        int posNum = (int) Math.pow(2, i % 8);
-        return (byteNum / posNum) % 2 == 1;
+        int byteNum = header[i / 8];//要判断的位置在第几个字节
+        int posNum = i % 8;//要判断的位置在该字节的第几位，然后将该字节右移posNum位，则此时最低位就是需要判断的位置
+        byteNum = byteNum >= 0 ? byteNum : byteNum + 256;//不知道为什么byte强转int出现了复数，所以判断一下如果为负加上256貌似解决了问题
+        posNum = (int) Math.pow(2, posNum);//右移出现了问题，所以改成除2的相应次幂
+        return (byteNum / posNum) % 2 == 1;//如果移位之后模2为1，则最低位为1即该slot被使用过了
     }
 
     /**
@@ -323,11 +325,13 @@ public class HeapPage implements Page {
     public Iterator<Tuple> iterator() {
         // some code goes here
         return new Iterator<Tuple>() {
+            //next()需要返回使用过的slot对应的tuple，所以加入pos作为使用过的slot的索引
             private int index = 0;
             private int pos = 0;
 
             @Override
             public boolean hasNext() {
+                //如果tuple索引不超过其数量，并且pos大小不超过已使用过的slots数量
                 return (index < getNumTuples() && (pos < getNumTuples() - getNumEmptySlots()));
             }
 
@@ -339,7 +343,7 @@ public class HeapPage implements Page {
                 while (!isSlotUsed(index)) {
                     index++;
                 }
-                pos++;
+                pos++;//找到一个使用过的slot就加1
                 return tuples[index++];
             }
         };

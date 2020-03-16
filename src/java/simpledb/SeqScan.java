@@ -97,7 +97,7 @@ public class SeqScan implements OpIterator {
         String[] field = new String[tupleDesc.numFields()];
         for (int i = 0; i < tupleDesc.numFields(); i++) {
             type[i] = tupleDesc.getFieldType(i);
-            String prefix = tableAlias == null ? "null." : (tableAlias + ".");
+            String prefix = tableAlias == null ? "null." : (tableAlias + ".");//前缀，如果为空则加入字符串"null"
             String name = tupleDesc.getFieldName(i) == null ? "null" : tupleDesc.getFieldName(i);
             field[i] = prefix + name;
         }

@@ -18,6 +18,7 @@ public class HeapFile implements DbFile {
 
     private File file;
     private TupleDesc tupleDesc;
+    //page数量
     private int numpages;
 
     /**
@@ -75,14 +76,14 @@ public class HeapFile implements DbFile {
         if (pid.getTableId() != getId()) {
             return null;
         } else {
-            int pos = pid.getPageNumber() * BufferPool.DEFAULT_PAGE_SIZE;
+            int pos = pid.getPageNumber() * BufferPool.DEFAULT_PAGE_SIZE;//找到page在HeadPage上的偏移量
             File file = getFile();
             Page page = null;
-            byte[] data = new byte[BufferPool.DEFAULT_PAGE_SIZE];
+            byte[] data = new byte[BufferPool.DEFAULT_PAGE_SIZE];//用于存要读的page
             try {
                 RandomAccessFile raf = new RandomAccessFile(file, "r");//RandomAccessFile可以自由访问文件的任意位置
                 raf.seek(pos);//将记录指针定位到pos位置
-                raf.read(data, 0, data.length);//读一个page长度，存入data中
+                raf.read(data, 0, data.length);//读一个page，存入data中
                 page = new HeapPage((HeapPageId) pid, data);
             } catch (FileNotFoundException e) {
                 e.printStackTrace();
@@ -126,6 +127,7 @@ public class HeapFile implements DbFile {
     // see DbFile.java for javadocs
     public DbFileIterator iterator(TransactionId tid) {
         // some code goes here
+        //尝试了好多方法，都不能用tid，查到一个想法，存储一个当前正在遍历页的tuples迭代器，一页一页的遍历
         return new HeapFileIterator(tid);
     }
 
@@ -140,6 +142,7 @@ public class HeapFile implements DbFile {
         }
 
         private Iterator<Tuple> GetTuplesInPage(HeapPageId pid) throws DbException, TransactionAbortedException {
+            //不能直接使用HeapFile的readPage方法，而是通过BufferPool来获得page
             HeapPage heapPage = (HeapPage) Database.getBufferPool().getPage(tid, pid, Permissions.READ_ONLY);
             return heapPage.iterator();
         }
@@ -147,6 +150,7 @@ public class HeapFile implements DbFile {
         @Override
         public void open() throws DbException, TransactionAbortedException {
             index = 0;
+            //加载第一页的tuples
             HeapPageId pid = new HeapPageId(getId(), index);
             TuplesInPage = GetTuplesInPage(pid);
         }
@@ -154,12 +158,16 @@ public class HeapFile implements DbFile {
         @Override
         public boolean hasNext() throws DbException, TransactionAbortedException {
             if (TuplesInPage == null) {
+                //如果遍历页的迭代器为null说明迭代器已经关闭了
                 return false;
             } else {
                 if (TuplesInPage.hasNext()) {
+                    //如果当前页tuples迭代器还没有遍历完
                     return true;
                 } else {
                     if (index < numPages() - 1) {
+                        //还没有到达最后一页
+                        //不能直接返回true，需要判断下一页是否有tuples可读
                         index++;
                         HeapPageId pageId = new HeapPageId(getId(), index);
                         TuplesInPage = GetTuplesInPage(pageId);
@@ -174,12 +182,15 @@ public class HeapFile implements DbFile {
             if (!hasNext()) {
                 throw new NoSuchElementException();
             } else {
+                //写index++，一直报错
+                //这里index不需要再加1了，hasNext()判断的时候已经到了下一个tuple或者下一页的tuple
                 return TuplesInPage.next();
             }
         }
 
         @Override
         public void rewind() throws DbException, TransactionAbortedException {
+            //重新读一次
             open();
         }
 

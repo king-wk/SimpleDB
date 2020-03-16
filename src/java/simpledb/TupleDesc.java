@@ -42,13 +42,13 @@ public class TupleDesc implements Serializable {
      */
     public Iterator<TDItem> iterator() {
         // some code goes here
-        if (items.size() >= 0) {
+        if (items.size() > 0) {//如果
             return new Iterator<TDItem>() {
                 private Integer index = 0;
 
                 @Override
                 public boolean hasNext() {
-                    return index < items.size();
+                    return index < items.size();//如果当前索引小于items的数量，那么就有下一个item
                 }
 
                 @Override
@@ -56,7 +56,7 @@ public class TupleDesc implements Serializable {
                     if (!hasNext()) {
                         throw new NoSuchElementException();
                     }
-                    return items.get(index++);
+                    return items.get(index++);//返回索引值对应的item并且将索引往后移一位
                 }
             };
         } else return null;
@@ -75,7 +75,10 @@ public class TupleDesc implements Serializable {
      */
     public TupleDesc(Type[] typeAr, String[] fieldAr) {
         // some code goes here
-        items = new ArrayList<>();
+        if (typeAr.length != fieldAr.length || typeAr.length <= 0) {//如果type数组和field数组长度不等或者数组为空，抛出异常
+            throw new IllegalArgumentException();
+        }
+        items = new ArrayList<>(typeAr.length);
         for (int i = 0; i < typeAr.length; i++) {
             TDItem item = new TDItem(typeAr[i], fieldAr[i]);
             items.add(item);
@@ -91,7 +94,7 @@ public class TupleDesc implements Serializable {
      */
     public TupleDesc(Type[] typeAr) {
         // some code goes here
-        items = new ArrayList<>();
+        items = new ArrayList<>(typeAr.length);
         for (int i = 0; i < typeAr.length; i++) {
             TDItem item = new TDItem(typeAr[i], null);
             items.add(item);
@@ -116,7 +119,7 @@ public class TupleDesc implements Serializable {
      */
     public String getFieldName(int i) throws NoSuchElementException {
         // some code goes here
-        if (i >= numFields() || i < 0) {
+        if (i >= numFields() || i < 0) {//如果查询索引小于0或大于等于fields的长度，抛出异常
             throw new NoSuchElementException();
         }
         return items.get(i).fieldName;
@@ -132,7 +135,7 @@ public class TupleDesc implements Serializable {
      */
     public Type getFieldType(int i) throws NoSuchElementException {
         // some code goes here
-        if (i >= numFields() || i < 0) {
+        if (i >= numFields() || i < 0) {//如果查询索引小于0或大于等于fields的长度，抛出异常
             throw new NoSuchElementException();
         }
         return items.get(i).fieldType;
@@ -192,6 +195,7 @@ public class TupleDesc implements Serializable {
             typeAr[i + length1] = td2.items.get(i).fieldType;
             fieldAr[i + length1] = td2.items.get(i).fieldName;
         }
+        //合并两个TupleDesc的filedtype和fieldname，感觉有些繁琐
         return new TupleDesc(typeAr, fieldAr);
     }
 
@@ -207,17 +211,14 @@ public class TupleDesc implements Serializable {
 
     public boolean equals(Object o) {
         // some code goes here
-        if (o == null) {
+        if (o == null) {//如果o是null抛出异常
             return false;
         }
-        if (this == o) {
-            return true;
-        }
-        if (o instanceof TupleDesc) {
-            TupleDesc another = (TupleDesc) o;
-            if (another.numFields() == this.numFields()) {
+        if (o instanceof TupleDesc) {//判断o是否是TupleDesc的实现类
+            TupleDesc another = (TupleDesc) o;//强制类型转换
+            if (another.numFields() == this.numFields()) {//判断两个TupleDesc是否有相同数量的items
                 for (int i = 0; i < numFields(); i++) {
-                    if (!another.items.get(i).fieldType.equals(items.get(i).fieldType)) {
+                    if (!another.items.get(i).fieldType.equals(items.get(i).fieldType)) {//判断两个TupleDesc对应的每一个item的fieldtype是否相同
                         return false;
                     }
                 }
@@ -229,7 +230,8 @@ public class TupleDesc implements Serializable {
     public int hashCode() {
         // If you want to use TupleDesc as keys for HashMap, implement this so
         // that equal objects have equals hashCode() results
-        throw new UnsupportedOperationException("unimplemented");
+        return numFields() * 8;//随便写的好像不影响啥
+        //throw new UnsupportedOperationException("unimplemented");
     }
 
     /**

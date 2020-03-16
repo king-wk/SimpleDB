@@ -46,8 +46,7 @@ public class HeapPageId implements PageId {
      */
     public int hashCode() {
         // some code goes here
-        int result = 31 * tableId + pageNum;
-        return result;
+        return 8 * tableId + pageNum;
         //throw new UnsupportedOperationException("implement this");
     }
 
@@ -63,14 +62,11 @@ public class HeapPageId implements PageId {
         if (o == null) {
             return false;
         } else {
-            if (o == this) {
-                return true;
-            } else {
-                if (o instanceof PageId) {
-                    PageId another = (PageId) o;
-                    return another.getPageNumber() == this.pageNum && another.getTableId() == this.tableId;
-                } else return false;
-            }
+            if (o instanceof PageId) {//判断o是否是PageId的实例类
+                PageId another = (PageId) o;//强制转换
+                //判断两个类的page数量和TableId是否相同
+                return another.getPageNumber() == this.pageNum && another.getTableId() == this.tableId;
+            } else return false;
         }
     }
 

@@ -30,7 +30,9 @@ public class BufferPool {
      * constructor instead.
      */
     public static final int DEFAULT_PAGES = 50;
-    HashMap<PageId, Page> pageId;
+    //建立id到page的一一映射
+    private HashMap<PageId, Page> pageId;
+    //页的最大数量
     private int MAX_Page;
 
     /**
@@ -75,21 +77,22 @@ public class BufferPool {
      */
     public Page getPage(TransactionId tid, PageId pid, Permissions perm) throws TransactionAbortedException, DbException {
         // some code goes here
-        if (pageId.containsKey(pid)) {
-            return pageId.get(pid);
-        } else {
-            HeapFile table = (HeapFile) Database.getCatalog().getDatabaseFile(pid.getTableId());
+        //不知道这个方法里的tid和perm的作用，好像不影响
+        if (pageId.containsKey(pid)) {//判断要返回的page是否已存在
+            return pageId.get(pid);//如果存在直接返回page
+        } else {//如果不存在，把需要返回的page加进去，再返回对应page
+            HeapFile table = (HeapFile) Database.getCatalog().getDatabaseFile(pid.getTableId());//找到tableid对应的table
             HeapPage newPage = (HeapPage) table.readPage(pid);
-            if (pageId.size() == MAX_Page) {
+            if (pageId.size() == MAX_Page) {//判断缓冲池里是否还有空间，如果没有空间，就清除最后一个page
                 int number = 1;
-                for (PageId pd : pageId.keySet()) {
+                for (PageId pd : pageId.keySet()) {//循环找到最后一个page
                     if (number == MAX_Page) {
-                        pageId.remove(pd);
+                        pageId.remove(pd);//清除最后一个page
                     }
                     number++;
                 }
             }
-            pageId.put(pid, newPage);
+            pageId.put(pid, newPage);//把新的page放入
             return newPage;
         }
     }

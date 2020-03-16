@@ -17,9 +17,14 @@ import java.util.concurrent.ConcurrentHashMap;
  * @Threadsafe
  */
 public class Catalog {
+    //好几个方法需要利用key-value的形式，用hashmap应该是（我能想到的）最方便的吧
+    //建立id到file的一一映射
     private HashMap<Integer, DbFile> idfile;
+    //建立id到表名的一一映射
     private HashMap<Integer, String> idname;
+    //建立id到表的主键的一一映射
     private HashMap<Integer, String> idkey;
+    //建立表名到id的一一映射
     private HashMap<String, Integer> nameid;
 
     /**
@@ -50,8 +55,8 @@ public class Catalog {
             throw new IllegalArgumentException();
         }
         int tableid = file.getId();
-        if (nameid.containsKey(tableid)) {
-            idfile.replace(tableid, file);
+        if (nameid.containsKey(tableid)) {//判断file对应的表名是否已经存在
+            idfile.replace(tableid, file);//如果表名已经存在，用最新的表代替之前的表
         } else {
             idfile.put(tableid, file);
             idname.put(tableid, name);
@@ -98,7 +103,7 @@ public class Catalog {
      */
     public TupleDesc getTupleDesc(int tableid) throws NoSuchElementException {
         // some code goes here
-        if (!idfile.containsKey(tableid)) {
+        if (!idfile.containsKey(tableid)) {//判断tableid对应的table是否存在
             throw new NoSuchElementException();
         }
         return idfile.get(tableid).getTupleDesc();
@@ -113,7 +118,7 @@ public class Catalog {
      */
     public DbFile getDatabaseFile(int tableid) throws NoSuchElementException {
         // some code goes here
-        if (!idfile.containsKey(tableid)) {
+        if (!idfile.containsKey(tableid)) {//判断tableid对应的table是否存在
             throw new NoSuchElementException();
         }
         return idfile.get(tableid);
@@ -121,7 +126,7 @@ public class Catalog {
 
     public String getPrimaryKey(int tableid) {
         // some code goes here
-        if (!idkey.containsKey(tableid)) {
+        if (!idkey.containsKey(tableid)) {//判断tableid对应的table是否存在
             throw new NoSuchElementException();
         }
         return idkey.get(tableid);
@@ -134,7 +139,7 @@ public class Catalog {
 
     public String getTableName(int id) {
         // some code goes here
-        if (!idname.containsKey(id)) {
+        if (!idname.containsKey(id)) {//判断id对应的name是否存在
             throw new NoSuchElementException();
         }
         return idname.get(id);
@@ -145,6 +150,7 @@ public class Catalog {
      */
     public void clear() {
         // some code goes here
+        //所有的hashmap都clear就行了吧
         idfile.clear();
         idname.clear();
         idkey.clear();
