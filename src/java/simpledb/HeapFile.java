@@ -160,6 +160,7 @@ public class HeapFile implements DbFile {
                     return true;
                 } else {
                     if (index < numPages() - 1) {
+                        index++;
                         HeapPageId pageId = new HeapPageId(getId(), index);
                         TuplesInPage = GetTuplesInPage(pageId);
                         return TuplesInPage.hasNext();
@@ -173,7 +174,6 @@ public class HeapFile implements DbFile {
             if (!hasNext()) {
                 throw new NoSuchElementException();
             } else {
-                index++;
                 return TuplesInPage.next();
             }
         }
