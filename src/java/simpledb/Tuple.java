@@ -11,6 +11,7 @@ import java.util.*;
 public class Tuple implements Serializable {
     private TupleDesc tupleDesc;
     private Field[] fields;
+    //tuple在磁盘中的位置
     private RecordId recordId;
     private static final long serialVersionUID = 1L;
 
@@ -102,12 +103,13 @@ public class Tuple implements Serializable {
      */
     public Iterator<Field> fields() {
         // some code goes here
-        if (fields.length >= 0) {
+        if (fields.length > 0) {
             return new Iterator<Field>() {
                 private int index = 0;
 
                 @Override
                 public boolean hasNext() {
+                    //如果当前索引小于字段的数量，那么就有下一个字段
                     return index < fields.length;
                 }
 
@@ -116,6 +118,7 @@ public class Tuple implements Serializable {
                     if (!hasNext()) {
                         throw new NoSuchElementException();
                     }
+                    //返回索引值对应的字段并且将索引往后移一位
                     return fields[index++];
                 }
             };

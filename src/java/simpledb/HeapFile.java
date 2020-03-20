@@ -74,7 +74,7 @@ public class HeapFile implements DbFile {
     public Page readPage(PageId pid) {
         // some code goes here
         if (pid.getTableId() != getId()) {
-            return null;
+            throw new IllegalArgumentException();
         } else {
             int pos = pid.getPageNumber() * BufferPool.DEFAULT_PAGE_SIZE;//找到page在HeadPage上的偏移量
             File file = getFile();
@@ -85,8 +85,6 @@ public class HeapFile implements DbFile {
                 raf.seek(pos);//将记录指针定位到pos位置
                 raf.read(data, 0, data.length);//读一个page，存入data中
                 page = new HeapPage((HeapPageId) pid, data);
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -127,7 +125,7 @@ public class HeapFile implements DbFile {
     // see DbFile.java for javadocs
     public DbFileIterator iterator(TransactionId tid) {
         // some code goes here
-        //尝试了好多方法，都不能用tid，查到一个想法，存储一个当前正在遍历页的tuples迭代器，一页一页的遍历
+        //存储一个当前正在遍历页的tuples迭代器，一页一页的遍历
         return new HeapFileIterator(tid);
     }
 

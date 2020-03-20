@@ -70,7 +70,8 @@ public class HeapPage implements Page {
      */
     private int getNumTuples() {
         // some code goes here
-        return (int) Math.floor((BufferPool.DEFAULT_PAGE_SIZE * 8.0) / (td.getSize() * 8 + 1));
+        return (int) Math.floor(
+                (BufferPool.DEFAULT_PAGE_SIZE * 8.0) / (td.getSize() * 8 + 1));
     }
 
     /**
@@ -287,7 +288,7 @@ public class HeapPage implements Page {
     public int getNumEmptySlots() {
         // some code goes here
         int emptySlots = 0;
-        for (int i = 0; i < getNumTuples(); i++) {
+        for (int i = 0; i < numSlots; i++) {
             if (!isSlotUsed(i)) {//如果没有使用过，则emptySlot加1
                 emptySlots++;
             }
@@ -303,11 +304,11 @@ public class HeapPage implements Page {
         if (i < 0 || i > getNumTuples() || i / 8 >= header.length) {
             return false;
         }
-        int byteNum = header[i / 8];//要判断的位置在第几个字节
-        int posNum = i % 8;//要判断的位置在该字节的第几位，然后将该字节右移posNum位，则此时最低位就是需要判断的位置
-        byteNum = byteNum >= 0 ? byteNum : byteNum + 256;//不知道为什么byte强转int出现了复数，所以判断一下如果为负加上256貌似解决了问题
-        posNum = (int) Math.pow(2, posNum);//右移出现了问题，所以改成除2的相应次幂
-        return (byteNum / posNum) % 2 == 1;//如果移位之后模2为1，则最低位为1即该slot被使用过了
+        int byteNum = header[i / 8];//要判断的位置在索引为几的字节上
+        int posNum = i % 8;//要判断的位置在该字节索引为几的位上
+        byteNum = byteNum >> posNum;//将该字节右移posNum位，则此时最低位就是需要判断的位置
+        byteNum = byteNum >= 0 ? byteNum : byteNum + 256;//不知道为什么byte强转int出现了负数，所以判断一下如果为负加上256
+        return byteNum % 2 == 1;//如果模2为1，则最低位为1即该slot被使用过了
     }
 
     /**
@@ -325,14 +326,15 @@ public class HeapPage implements Page {
     public Iterator<Tuple> iterator() {
         // some code goes here
         return new Iterator<Tuple>() {
-            //next()需要返回使用过的slot对应的tuple，所以加入pos作为使用过的slot的索引
+            //next()需要返回使用过的slot对应的tuple，所以加入pos作为记录使用过的slot的数量
             private int index = 0;
             private int pos = 0;
 
             @Override
             public boolean hasNext() {
                 //如果tuple索引不超过其数量，并且pos大小不超过已使用过的slots数量
-                return (index < getNumTuples() && (pos < getNumTuples() - getNumEmptySlots()));
+                return (index < getNumTuples() &&
+                        (pos < getNumTuples() - getNumEmptySlots()));
             }
 
             @Override

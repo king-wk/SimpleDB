@@ -65,7 +65,8 @@ public class HeapPageId implements PageId {
             if (o instanceof PageId) {//判断o是否是PageId的实例类
                 PageId another = (PageId) o;//强制转换
                 //判断两个类的page数量和TableId是否相同
-                return another.getPageNumber() == this.pageNum && another.getTableId() == this.tableId;
+                return another.getPageNumber() == this.pageNum &&
+                        another.getTableId() == this.tableId;
             } else return false;
         }
     }

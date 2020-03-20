@@ -55,14 +55,11 @@ public class Catalog {
             throw new IllegalArgumentException();
         }
         int tableid = file.getId();
-        if (nameid.containsKey(tableid)) {//判断file对应的表名是否已经存在
-            idfile.replace(tableid, file);//如果表名已经存在，用最新的表代替之前的表
-        } else {
-            idfile.put(tableid, file);
-            idname.put(tableid, name);
-            idkey.put(tableid, pkeyField);
-            nameid.put(name, tableid);
-        }
+        idfile.put(tableid, file);
+        idname.put(tableid, name);
+        idkey.put(tableid, pkeyField);
+        nameid.put(name, tableid);
+
     }
 
     public void addTable(DbFile file, String name) {
@@ -88,7 +85,7 @@ public class Catalog {
      */
     public int getTableId(String name) throws NoSuchElementException {
         // some code goes here
-        if (name == null || (!nameid.containsKey(name))) {
+        if (name == null || (!nameid.containsKey(name))) {//判断name是否为null以及name对应的id是否存在
             throw new NoSuchElementException();
         }
         return nameid.get(name);
@@ -103,7 +100,7 @@ public class Catalog {
      */
     public TupleDesc getTupleDesc(int tableid) throws NoSuchElementException {
         // some code goes here
-        if (!idfile.containsKey(tableid)) {//判断tableid对应的table是否存在
+        if (!idfile.containsKey(tableid)) {//判断tableid对应的file是否存在
             throw new NoSuchElementException();
         }
         return idfile.get(tableid).getTupleDesc();
@@ -118,7 +115,7 @@ public class Catalog {
      */
     public DbFile getDatabaseFile(int tableid) throws NoSuchElementException {
         // some code goes here
-        if (!idfile.containsKey(tableid)) {//判断tableid对应的table是否存在
+        if (!idfile.containsKey(tableid)) {//判断tableid对应的file是否存在
             throw new NoSuchElementException();
         }
         return idfile.get(tableid);
@@ -126,7 +123,7 @@ public class Catalog {
 
     public String getPrimaryKey(int tableid) {
         // some code goes here
-        if (!idkey.containsKey(tableid)) {//判断tableid对应的table是否存在
+        if (!idkey.containsKey(tableid)) {//判断tableid对应的主键是否存在
             throw new NoSuchElementException();
         }
         return idkey.get(tableid);
@@ -134,7 +131,7 @@ public class Catalog {
 
     public Iterator<Integer> tableIdIterator() {
         // some code goes here
-        return idname.keySet().iterator();
+        return idfile.keySet().iterator();
     }
 
     public String getTableName(int id) {
