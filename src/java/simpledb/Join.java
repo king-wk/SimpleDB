@@ -12,6 +12,8 @@ public class Join extends Operator {
     private OpIterator child1;
     private OpIterator child2;
     private TupleDesc tupleDesc;
+    private Tuple tuple1;
+    private Tuple tuple2;
 
     /**
      * Constructor. Accepts two children to join and the predicate to join them
@@ -26,7 +28,7 @@ public class Join extends Operator {
         this.p = p;
         this.child1 = child1;
         this.child2 = child2;
-        TupleDesc.merge(child1.getTupleDesc(), child2.getTupleDesc());
+        tupleDesc = TupleDesc.merge(child1.getTupleDesc(), child2.getTupleDesc());
     }
 
     public JoinPredicate getJoinPredicate() {
@@ -103,18 +105,15 @@ public class Join extends Operator {
      */
     protected Tuple fetchNext() throws TransactionAbortedException, DbException {
         // some code goes here
-        Tuple tuple1=null;
-        Tuple tuple2=null;
-        if(child1.hasNext()){
-            tuple1=child1.next();
-        }
-        while (tuple1!=null){
-            while (child2.hasNext()){
-                tuple2=child2.next();
-                if(p.filter(tuple1,tuple2)){
+        if (tuple1 == null && child1.hasNext())
+            tuple1 = child1.next();
+        while (tuple1 != null) {
+            while (child2.hasNext()) {
+                tuple2 = child2.next();
+                if (p.filter(tuple1, tuple2)) {
                     Tuple newTuple = new Tuple(getTupleDesc());
-                    Iterator<Field> iterator = tuple1.fields();
                     int i = 0;
+                    Iterator<Field> iterator = tuple1.fields();
                     while (iterator.hasNext()) {
                         newTuple.setField(i++, iterator.next());
                     }
@@ -128,7 +127,7 @@ public class Join extends Operator {
             child2.rewind();
             if (child1.hasNext()) {
                 tuple1 = child1.next();
-            }else return null;
+            } else return null;
         }
         return null;
     }
@@ -142,8 +141,9 @@ public class Join extends Operator {
     @Override
     public void setChildren(OpIterator[] children) {
         // some code goes here
-            child1 = children[0];
-            child2 = children[1];
+        //if (children.length != 2) return;
+        child1 = children[0];
+        child2 = children[1];
     }
 
 }
