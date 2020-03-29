@@ -72,20 +72,17 @@ public class IntegerAggregator implements Aggregator {
                 groupValue.put(gField, groupTuple.get(gField).size());
                 break;
             case SUM:
-
                 int sumValue = groupValue.get(gField) == null ? 0 : groupValue.get(gField);
                 sumValue += ((IntField) tup.getField(afield)).getValue();
                 groupValue.put(gField, sumValue);
                 break;
             case MIN:
-
                 int min = groupValue.get(gField) == null ? Integer.MAX_VALUE : groupValue.get(gField);
                 tupValue = ((IntField) tup.getField(afield)).getValue();
                 min = Math.min(min, tupValue);
                 groupValue.put(gField, min);
                 break;
             case MAX:
-
                 int max = groupValue.get(gField) == null ? Integer.MIN_VALUE : groupValue.get(gField);
                 tupValue = ((IntField) tup.getField(afield)).getValue();
                 max = Math.max(max, tupValue);
@@ -98,8 +95,9 @@ public class IntegerAggregator implements Aggregator {
                 }
                 groupValue.put(gField, result / tuples.size());
                 break;
+            default:
+                throw new IllegalArgumentException();
         }
-
     }
 
     /**
@@ -131,6 +129,9 @@ public class IntegerAggregator implements Aggregator {
                 tuple.setField(1, new IntField(k.getValue()));
             }
             tuples.add(tuple);
+        }
+        if (tuples.size() == 0) {
+            return new TupleIterator(new TupleDesc(new Type[]{gbfieldtype}), tuples);
         }
         return new TupleIterator(tuples.get(0).getTupleDesc(), tuples);
     }

@@ -51,6 +51,9 @@ public class RecordId implements Serializable {
     @Override
     public boolean equals(Object o) {
         // some code goes here
+        if (o == this) {
+            return true;
+        }
         if (o == null) {
             return false;
         }
