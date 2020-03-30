@@ -19,6 +19,8 @@ public class HeapPage implements Page {
     private final Tuple tuples[];
     private int numSlots;
 
+    private TransactionId pageDirty;
+
     private byte[] oldData;
     private final Byte oldDataLock = new Byte((byte) 0);
 
@@ -249,6 +251,15 @@ public class HeapPage implements Page {
     public void deleteTuple(Tuple t) throws DbException {
         // some code goes here
         // not necessary for lab1
+        RecordId tid = t.getRecordId();
+        HeapPageId hid = (HeapPageId) tid.getPageId();
+        int tupleNum = tid.getTupleNumber();
+        //判断tuple是否在这个page上以及对应slot是否为空
+        if ((!hid.equals(pid)) || !(isSlotUsed(tupleNum))) {
+            throw new DbException("this tuple is not on this page, or tuple slot is already empty.");
+        }
+        tuples[tupleNum] = null;
+        markSlotUsed(tupleNum, false);
     }
 
     /**
@@ -262,6 +273,18 @@ public class HeapPage implements Page {
     public void insertTuple(Tuple t) throws DbException {
         // some code goes here
         // not necessary for lab1
+        if (getNumEmptySlots() == 0 || (!td.equals(t.getTupleDesc()))) {
+            throw new DbException("the page is full (no empty slots) or tupledesc is mismatch.");
+        }
+        for (int i = 0; i < getNumTuples(); i++) {
+            if (!isSlotUsed(i)) {
+                tuples[i] = t;
+                //修改tuple的信息，表明它现在存储在这个page上,不修改报错死啦死啦
+                t.setRecordId(new RecordId(pid, i));
+                markSlotUsed(i, true);
+                return;
+            }
+        }
     }
 
     /**
@@ -271,6 +294,7 @@ public class HeapPage implements Page {
     public void markDirty(boolean dirty, TransactionId tid) {
         // some code goes here
         // not necessary for lab1
+        pageDirty = dirty ? tid : null;
     }
 
     /**
@@ -279,7 +303,7 @@ public class HeapPage implements Page {
     public TransactionId isDirty() {
         // some code goes here
         // Not necessary for lab1
-        return null;
+        return pageDirty;
     }
 
     /**
@@ -317,6 +341,11 @@ public class HeapPage implements Page {
     private void markSlotUsed(int i, boolean value) {
         // some code goes here
         // not necessary for lab1
+        int byteNum = i / 8;
+        int posNum = i % 8;
+        byte b = (byte) (1 << posNum);//将1左移到指定位置
+        //如果指定value为1，那么与00010000进行或运算，将指定位置变为1，如果为0，与11101111进行与运算，将指定位置变为0（以posNum为4为例）
+        header[byteNum] = value ? (byte) (header[byteNum] | b) : (byte) (header[byteNum] & ~b);
     }
 
     /**
