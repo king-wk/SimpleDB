@@ -270,7 +270,7 @@ public class HeapPage implements Page {
      * @throws DbException if the page is full (no empty slots) or tupledesc
      *                     is mismatch.
      */
-    public void insertTuple(Tuple t) throws DbException {
+    public void insertTuple(Tuple t) throws DbException, TransactionAbortedException {
         // some code goes here
         // not necessary for lab1
         if (getNumEmptySlots() == 0 || (!td.equals(t.getTupleDesc()))) {
@@ -278,10 +278,10 @@ public class HeapPage implements Page {
         }
         for (int i = 0; i < getNumTuples(); i++) {
             if (!isSlotUsed(i)) {
-                tuples[i] = t;
+                markSlotUsed(i, true);
                 //修改tuple的信息，表明它现在存储在这个page上,不修改报错死啦死啦
                 t.setRecordId(new RecordId(pid, i));
-                markSlotUsed(i, true);
+                tuples[i] = t;
                 return;
             }
         }
