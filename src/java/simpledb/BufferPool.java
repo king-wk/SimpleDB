@@ -4,6 +4,8 @@ import java.io.*;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -35,6 +37,8 @@ public class BufferPool {
     private HashMap<PageId, Page> pageId;
     //页的最大数量
     private int MAX_Page;
+    private TransactionId transactionId;
+    private Permissions permissions;
 
     /**
      * Creates a BufferPool that caches up to numPages pages.
@@ -78,6 +82,8 @@ public class BufferPool {
      */
     public Page getPage(TransactionId tid, PageId pid, Permissions perm) throws TransactionAbortedException, DbException {
         // some code goes here
+        this.transactionId = tid;
+        this.permissions = perm;
         //不知道这个方法里的tid和perm的作用，好像不影响
         if (pageId.containsKey(pid)) {//判断要返回的page是否已存在
             return pageId.get(pid);//如果存在直接返回page
@@ -204,7 +210,9 @@ public class BufferPool {
     public synchronized void flushAllPages() throws IOException {
         // some code goes here
         // not necessary for lab1
-
+        for (Map.Entry<PageId, Page> page : pageId.entrySet()) {
+            flushPage(page.getKey());
+        }
     }
 
     /**
@@ -219,6 +227,7 @@ public class BufferPool {
     public synchronized void discardPage(PageId pid) {
         // some code goes here
         // not necessary for lab1
+        pageId.remove(pid);
     }
 
     /**
@@ -229,6 +238,14 @@ public class BufferPool {
     private synchronized void flushPage(PageId pid) throws IOException {
         // some code goes here
         // not necessary for lab1
+        try {
+            Page page = getPage(transactionId, pid, permissions);
+            HeapFile heapFile = (HeapFile) Database.getCatalog().getDatabaseFile(pid.getTableId());
+            heapFile.writePage(page);
+            page.markDirty(false, null);
+        } catch (TransactionAbortedException | DbException e) {
+            e.printStackTrace();
+        }
     }
 
     /**
