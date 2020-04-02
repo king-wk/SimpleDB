@@ -355,15 +355,16 @@ public class HeapPage implements Page {
     public Iterator<Tuple> iterator() {
         // some code goes here
         return new Iterator<Tuple>() {
-            //next()需要返回使用过的slot对应的tuple，所以加入pos作为记录使用过的slot的数量
-            private int index = 0;
-            private int pos = 0;
+            //next()需要返回使用过的slot对应的tuple
+            private int index = -1;
 
             @Override
             public boolean hasNext() {
-                //如果tuple索引不超过其数量，并且pos大小不超过已使用过的slots数量
-                return (index < getNumTuples() &&
-                        (pos < getNumTuples() - getNumEmptySlots()));
+                while (index + 1 < getNumTuples() && !isSlotUsed(index + 1)) {
+                    index++;
+                }
+                //判断下一个使用过的slot对应的tuple索引是否存在
+                return index + 1 < getNumTuples();
             }
 
             @Override
@@ -371,11 +372,7 @@ public class HeapPage implements Page {
                 if (!hasNext()) {
                     throw new NoSuchElementException();
                 }
-                while (!isSlotUsed(index)) {
-                    index++;
-                }
-                pos++;//找到一个使用过的slot就加1
-                return tuples[index++];
+                return tuples[++index];
             }
         };
     }

@@ -203,12 +203,11 @@ public class HeapFile implements DbFile {
                     //如果当前页tuples迭代器还没有遍历完
                     return true;
                 } else {
-                    if (index < numPages() - 1) {
+                    if (index < numPages() - 1 && index >= 0) {
                         //还没有到达最后一页
                         //不能直接返回true，需要判断下一页是否有tuples可读
                         index++;
                         HeapPageId pageId = new HeapPageId(getId(), index);
-                        HeapPage page = (HeapPage) Database.getBufferPool().getPage(tid, pageId, Permissions.READ_ONLY);
                         TuplesInPage = GetTuplesInPage(pageId);
                         return TuplesInPage.hasNext();
                     } else return false;

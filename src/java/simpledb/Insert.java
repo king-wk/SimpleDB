@@ -13,6 +13,7 @@ public class Insert extends Operator {
     private OpIterator child;
     private int tableId;
     private boolean access;
+    private int num;
 
     /**
      * Constructor.
@@ -29,7 +30,8 @@ public class Insert extends Operator {
         this.t = t;
         this.child = child;
         this.tableId = tableId;
-        access = false;
+        this.access = false;
+        this.num = 0;
     }
 
     public TupleDesc getTupleDesc() {
@@ -73,7 +75,6 @@ public class Insert extends Operator {
             return null;
         }
         Tuple tuple = new Tuple(getTupleDesc());
-        int num = 0;
         while (child.hasNext()) {
             try {
                 Database.getBufferPool().insertTuple(t, tableId, child.next());
