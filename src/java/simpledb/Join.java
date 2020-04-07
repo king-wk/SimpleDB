@@ -107,10 +107,13 @@ public class Join extends Operator {
         // some code goes here
         if (tuple1 == null && child1.hasNext())
             tuple1 = child1.next();
+        //如果tuple1为空则无法实现连接操作
         while (tuple1 != null) {
+            //如果对应的tuple2不为空那么可以实现连接操作
             while (child2.hasNext()) {
                 tuple2 = child2.next();
                 if (p.filter(tuple1, tuple2)) {
+                    //tuple1和tuple2符合谓词过滤，遍历两个tuple的字段，实现连接操作，返回连接之后的字段
                     Tuple newTuple = new Tuple(getTupleDesc());
                     int i = 0;
                     Iterator<Field> iterator = tuple1.fields();
@@ -124,6 +127,7 @@ public class Join extends Operator {
                     return newTuple;
                 }
             }
+            //如果child2.next()为空，那么child1后移一个tuple重新判断连接操作
             child2.rewind();
             if (child1.hasNext()) {
                 tuple1 = child1.next();

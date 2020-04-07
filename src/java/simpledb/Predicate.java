@@ -106,8 +106,6 @@ public class Predicate implements Serializable {
      */
     public String toString() {
         // some code goes here
-        StringBuffer string = new StringBuffer();
-        string.append("f = ").append(field).append(" op = ").append(op.toString()).append(" operand = ").append(operand).append("\t");
-        return string.toString();
+        return "f = " + field + " op = " + op.toString() + " operand = " + operand + "\t";
     }
 }

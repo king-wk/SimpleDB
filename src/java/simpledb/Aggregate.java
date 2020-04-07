@@ -16,12 +16,11 @@ public class Aggregate extends Operator {
     private Aggregator.Op aop;
     private TupleDesc child_td;
     //真正的聚合操作是发生在聚合器Aggregator中的，聚合的结果在iterator()方法的返回值中
-    private Aggregator aggregator;
     //聚合的结果通过此Aggregator的Iterator访问
+    private Aggregator aggregator;
     private OpIterator aggregateIter;
     //指定了作为分组依据的那一列的值的类型
     private Type gbFieldType;
-    private TupleDesc td;
 
     /**
      * Constructor.
@@ -46,11 +45,13 @@ public class Aggregate extends Operator {
         Type aggreType = child_td.getFieldType(afield);
         //根据进行聚合的列的类型来判断aggreator的类型
         gbFieldType = gfield == Aggregator.NO_GROUPING ? null : child_td.getFieldType(gfield);
+        //判断聚合操作
         if (aggreType == Type.INT_TYPE) {
             aggregator = new IntegerAggregator(gfield, gbFieldType, afield, aop);
         } else if (aggreType == Type.STRING_TYPE) {
             aggregator = new StringAggregator(gfield, gbFieldType, afield, aop);
         }
+        //获取cover聚合结果的迭代器
         aggregateIter = aggregator.iterator();
     }
 
@@ -159,9 +160,7 @@ public class Aggregate extends Operator {
      */
     public TupleDesc getTupleDesc() {
         // some code goes here
-        if (td != null) {
-            return td;
-        }
+        TupleDesc td;
         Type[] types;
         String[] names;
         String aggName = child_td.getFieldName(afield);
@@ -192,9 +191,6 @@ public class Aggregate extends Operator {
     @Override
     public void setChildren(OpIterator[] children) {
         // some code goes here
-        if (children.length < 1) {
-            throw new IllegalArgumentException();
-        }
         child = children[0];
     }
 

@@ -83,10 +83,9 @@ public class StringAggregator implements Aggregator {
             //分别处理分组和不分组的情况
             if (gbfield == Aggregator.NO_GROUPING) {
                 List<Type> temp = new ArrayList<>();
-                temp.add(gbfieldtype);
+                temp.add(Type.INT_TYPE);
                 tuple = new Tuple(new TupleDesc(temp.toArray(new Type[0])));
                 tuple.setField(0, new IntField(k.getValue()));
-                System.out.println(temp.get(0));
             } else {
                 List<Type> temp = new ArrayList<>();
                 temp.add(gbfieldtype);

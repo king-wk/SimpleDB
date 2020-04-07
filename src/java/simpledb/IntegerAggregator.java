@@ -53,6 +53,7 @@ public class IntegerAggregator implements Aggregator {
      */
     public void mergeTupleIntoGroup(Tuple tup) {
         // some code goes here
+        //分组的字段
         Field gField = null;
         if (gbfield != -1) {
             gField = tup.getField(gbfield);
@@ -63,6 +64,7 @@ public class IntegerAggregator implements Aggregator {
         }
         tuples.add(tup);
         groupTuple.put(gField, tuples);
+        //如果聚合操作的字段类型不是Integer抛出异常
         if (tup.getField(afield).getType() != Type.INT_TYPE) {
             throw new IllegalArgumentException();
         }
@@ -90,8 +92,8 @@ public class IntegerAggregator implements Aggregator {
                 break;
             case AVG:
                 int result = 0;
-                for (int i = 0; i < tuples.size(); i++) {
-                    result += ((IntField) tuples.get(i).getField(afield)).getValue();
+                for (Tuple tuple : tuples) {
+                    result += ((IntField) tuple.getField(afield)).getValue();
                 }
                 groupValue.put(gField, result / tuples.size());
                 break;
@@ -115,16 +117,19 @@ public class IntegerAggregator implements Aggregator {
             Tuple tuple;
             //分别处理分组和不分组的情况
             if (gbfield == Aggregator.NO_GROUPING) {
+                //如果是不分组的情况，gbfieldtype=null
                 List<Type> temp = new ArrayList<>();
-                temp.add(gbfieldtype);
-                tuple = new Tuple(new TupleDesc(temp.toArray(new Type[0])));
-                tuple.setField(0, new IntField(k.getValue()));
-                System.out.println(temp.get(0));
-            } else {
-                List<Type> temp = new ArrayList<>();
-                temp.add(gbfieldtype);
                 temp.add(Type.INT_TYPE);
                 tuple = new Tuple(new TupleDesc(temp.toArray(new Type[0])));
+                tuple.setField(0, new IntField(k.getValue()));
+            } else {
+                List<Type> temp = new ArrayList<>();
+                //分组的情况：add两次是为了List转数组时长度足够
+                temp.add(gbfieldtype);
+                temp.add(Type.INT_TYPE);
+                //toArray()带参数能将List转变成指定类型长度一致的数组
+                tuple = new Tuple(new TupleDesc(temp.toArray(new Type[0])));
+                //将分组字段对应值以及聚合结果存入tuple中
                 tuple.setField(0, k.getKey());
                 tuple.setField(1, new IntField(k.getValue()));
             }
