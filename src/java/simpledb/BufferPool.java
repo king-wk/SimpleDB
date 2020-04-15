@@ -88,13 +88,14 @@ public class BufferPool {
         if (pageId.containsKey(pid)) {//判断要返回的page是否已存在
             return pageId.get(pid);//如果存在直接返回page
         } else {//如果不存在，把需要返回的page加进去，再返回对应page
-            HeapFile table = (HeapFile) Database.getCatalog().getDatabaseFile(pid.getTableId());//找到tableid对应的table
-            HeapPage newPage = (HeapPage) table.readPage(pid);
+            DbFile table = Database.getCatalog().getDatabaseFile(pid.getTableId());//找到tableid对应的table
+            Page newPage = table.readPage(pid);
             if (pageId.size() == MAX_Page) {//判断缓冲池里是否还有空间，如果没有空间，就清除最后一个page
                 int number = 1;
                 for (PageId pd : pageId.keySet()) {//循环找到最后一个page
                     if (number == MAX_Page) {
                         pageId.remove(pd);//清除最后一个page
+                        break;
                     }
                     number++;
                 }
