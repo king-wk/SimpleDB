@@ -266,8 +266,33 @@ public class BTreeFile implements DbFile {
         // the new entry.  getParentWithEmtpySlots() will be useful here.  Don't forget to update
         // the sibling pointers of all the affected leaf pages.  Return the page into which a
         // tuple with the given key field should be inserted.
-        return null;
-
+        BTreeLeafPage newleafPage = (BTreeLeafPage) getEmptyPage(tid, dirtypages, BTreePageId.LEAF);
+        Iterator<Tuple> tupleIterator = page.iterator();
+        if (tupleIterator == null || !tupleIterator.hasNext()) {
+            throw new DbException("");
+        }
+        int tuplenum = page.getNumTuples();
+        for (int i = 0; i < tuplenum / 2; i++) {
+            if (!tupleIterator.hasNext()) {
+                throw new DbException("");
+            }
+            Tuple t = tupleIterator.next();
+            page.deleteTuple(t);
+            newleafPage.insertTuple(t);
+        }
+        if (page.getLeftSiblingId() != null) {
+            BTreeLeafPage neighbor = (BTreeLeafPage) getPage(tid, dirtypages, page.getLeftSiblingId(), Permissions.READ_WRITE);
+            neighbor.setRightSiblingId(newleafPage.getId());
+        }
+        newleafPage.setLeftSiblingId((page.getLeftSiblingId()));
+        newleafPage.setRightSiblingId(page.getId());
+        page.setLeftSiblingId(newleafPage.getId());
+        Field field1 = tupleIterator.next().getField(keyField);
+        BTreeEntry bTreeEntry = new BTreeEntry(field1, newleafPage.getId(), page.getId());
+        BTreeInternalPage parent = getParentWithEmptySlots(tid, dirtypages, page.getParentId(), field1);
+        parent.insertEntry(bTreeEntry);
+        updateParentPointers(tid, dirtypages, parent);
+        return (field1.compare(Op.GREATER_THAN_OR_EQ, field)) ? newleafPage : page;
     }
 
     /**
@@ -303,7 +328,30 @@ public class BTreeFile implements DbFile {
         // the parent pointers of all the children moving to the new page.  updateParentPointers()
         // will be useful here.  Return the page into which an entry with the given key field
         // should be inserted.
-        return null;
+        BTreeInternalPage newinternalPage = (BTreeInternalPage) getEmptyPage(tid, dirtypages, BTreePageId.INTERNAL);
+        Iterator<BTreeEntry> entryIterator = page.iterator();
+        if (entryIterator == null || !entryIterator.hasNext()) {
+            throw new DbException("");
+        }
+        int entrynum = page.getNumEntries();
+        for (int i = 0; i < entrynum / 2; i++) {
+            if (!entryIterator.hasNext()) {
+                throw new DbException("");
+            }
+            BTreeEntry e = entryIterator.next();
+            page.deleteKeyAndLeftChild(e);
+            newinternalPage.insertEntry(e);
+        }
+        BTreeEntry e1 = entryIterator.next();
+        page.deleteKeyAndLeftChild(e1);
+        Field field1 = e1.getKey();
+        e1 = new BTreeEntry(field1, newinternalPage.getId(), page.getId());
+        updateParentPointers(tid, dirtypages, page);
+        updateParentPointers(tid, dirtypages, newinternalPage);
+        BTreeInternalPage parent = getParentWithEmptySlots(tid, dirtypages, page.getParentId(), field1);
+        parent.insertEntry(e1);
+        updateParentPointers(tid, dirtypages, parent);
+        return (field1.compare(Op.GREATER_THAN_OR_EQ, field)) ? newinternalPage : page;
     }
 
     /**

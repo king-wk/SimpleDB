@@ -94,7 +94,8 @@ public class BufferPool {
                 int number = 1;
                 for (PageId pd : pageId.keySet()) {//循环找到最后一个page
                     if (number == MAX_Page) {
-                        pageId.remove(pd);//清除最后一个page
+                        discardPage(pd);
+                        //pageId.remove(pd);//清除最后一个page
                         break;
                     }
                     number++;
@@ -170,7 +171,7 @@ public class BufferPool {
             throws DbException, IOException, TransactionAbortedException {
         // some code goes here
         // not necessary for lab1
-        HeapFile heapFile = (HeapFile) Database.getCatalog().getDatabaseFile(tableId);
+        DbFile heapFile = Database.getCatalog().getDatabaseFile(tableId);
         ArrayList<Page> pages = heapFile.insertTuple(tid, t);
         for (Page page : pages) {
             page.markDirty(true, tid);
