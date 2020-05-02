@@ -91,15 +91,7 @@ public class BufferPool {
             DbFile table = Database.getCatalog().getDatabaseFile(pid.getTableId());//找到tableid对应的table
             Page newPage = table.readPage(pid);
             if (pageId.size() == MAX_Page) {//判断缓冲池里是否还有空间，如果没有空间，就清除最后一个page
-                int number = 1;
-                for (PageId pd : pageId.keySet()) {//循环找到最后一个page
-                    if (number == MAX_Page) {
-                        discardPage(pd);
-                        //pageId.remove(pd);//清除最后一个page
-                        break;
-                    }
-                    number++;
-                }
+                this.evictPage();
             }
             pageId.put(pid, newPage);//把新的page放入
             return newPage;
@@ -212,8 +204,8 @@ public class BufferPool {
     public synchronized void flushAllPages() throws IOException {
         // some code goes here
         // not necessary for lab1
-        for (Map.Entry<PageId, Page> page : pageId.entrySet()) {
-            flushPage(page.getKey());
+        for (PageId pid : pageId.keySet()) {
+            flushPage(pid);
         }
     }
 
@@ -242,9 +234,11 @@ public class BufferPool {
         // not necessary for lab1
         try {
             Page page = getPage(transactionId, pid, permissions);
-            HeapFile heapFile = (HeapFile) Database.getCatalog().getDatabaseFile(pid.getTableId());
-            heapFile.writePage(page);
-            page.markDirty(false, null);
+            if (page != null && page.isDirty() != null) {
+                DbFile heapFile = Database.getCatalog().getDatabaseFile(pid.getTableId());
+                heapFile.writePage(page);
+                page.markDirty(false, null);
+            }
         } catch (TransactionAbortedException | DbException e) {
             e.printStackTrace();
         }
@@ -256,6 +250,12 @@ public class BufferPool {
     public synchronized void flushPages(TransactionId tid) throws IOException {
         // some code goes here
         // not necessary for lab1|lab2
+        for (PageId pid : pageId.keySet()) {
+            Page p = pageId.get(pid);
+            if (p != null && p.isDirty().equals(tid)) {
+                flushPage(pid);
+            }
+        }
     }
 
     /**
@@ -265,6 +265,22 @@ public class BufferPool {
     private synchronized void evictPage() throws DbException {
         // some code goes here
         // not necessary for lab1
+        ArrayList<PageId> cleanPages = new ArrayList<PageId>();
+        for (PageId pid : pageId.keySet()) {
+            if (pageId.get(pid).isDirty() == null) {
+                cleanPages.add(pid);
+            }
+        }
+        if (cleanPages.size() == 0) throw new DbException("No clean pages to evict!");
+        PageId vic = cleanPages.get(cleanPages.size() - 1);
+        try {
+            assert pageId.get(vic).isDirty() == null : "Evict a dirty page!";
+            flushPage(vic);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        discardPage(vic);
     }
+
 
 }
