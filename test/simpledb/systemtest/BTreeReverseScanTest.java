@@ -1,30 +1,16 @@
 package simpledb.systemtest;
 
-import simpledb.systemtest.SystemTestUtil;
-
-import static org.junit.Assert.*;
+import org.junit.Test;
+import simpledb.*;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.NoSuchElementException;
-import java.util.Random;
-import java.util.Iterator;
+import java.util.*;
 
-import org.junit.Test;
-import org.junit.Before;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
-import simpledb.*;
-import simpledb.Predicate.Op;
-
-/**
- * Dumps the contents of a table.
- * args[1] is the number of columns.  E.g., if it's 5, then BTreeScanTest will end
- * up dumping the contents of f4.0.txt.
- */
-public class BTreeScanTest extends SimpleDbTestBase {
+public class BTreeReverseScanTest extends SimpleDbTestBase {
     private final static Random r = new Random();
 
     /**
@@ -38,8 +24,8 @@ public class BTreeScanTest extends SimpleDbTestBase {
             for (int rows : rowSizes) {
                 ArrayList<ArrayList<Integer>> tuples = new ArrayList<ArrayList<Integer>>();
                 BTreeFile f = BTreeUtility.createRandomBTreeFile(columns, rows, null, tuples, keyField);
-                BTreeScan scan = new BTreeScan(tid, f.getId(), "table", null);
-                SystemTestUtil.matchTuples(scan, tuples);
+                BTreeReverseScan reverseScan = new BTreeReverseScan(tid, f.getId(), "table", null);
+                SystemTestUtil.matchTuples(reverseScan, tuples);
                 Database.resetBufferPool(BufferPool.DEFAULT_PAGES);
             }
         }
@@ -94,36 +80,37 @@ public class BTreeScanTest extends SimpleDbTestBase {
     }
 
     /**
-     * Test that rewinding a BTreeScan iterator works.
+     * Test that rewinding a BTreeReverseScan iterator works.
      */
     @Test
     public void testRewind() throws IOException, DbException, TransactionAbortedException {
         ArrayList<ArrayList<Integer>> tuples = new ArrayList<ArrayList<Integer>>();
         int keyField = r.nextInt(2);
         BTreeFile f = BTreeUtility.createRandomBTreeFile(2, 1000, null, tuples, keyField);
-        Collections.sort(tuples, new TupleComparator(keyField));
+        Collections.sort(tuples, new BTreeReverseScanTest.TupleComparator(keyField));
 
         TransactionId tid = new TransactionId();
-        BTreeScan scan = new BTreeScan(tid, f.getId(), "table", null);
-        scan.open();
-        for (int i = 0; i < 100; ++i) {
-            assertTrue(scan.hasNext());
-            Tuple t = scan.next();
+        BTreeReverseScan reverseScan = new BTreeReverseScan(tid, f.getId(), "table", null);
+        reverseScan.open();
+//        System.out.println(tuples.size());
+        for (int i = tuples.size() - 1; i >= 0; --i) {
+            assertTrue(reverseScan.hasNext());
+            Tuple t = reverseScan.next();
             assertEquals(tuples.get(i), SystemTestUtil.tupleToList(t));
         }
 
-        scan.rewind();
-        for (int i = 0; i < 100; ++i) {
-            assertTrue(scan.hasNext());
-            Tuple t = scan.next();
+        reverseScan.rewind();
+        for (int i = tuples.size() - 1; i >= 0; --i) {
+            assertTrue(reverseScan.hasNext());
+            Tuple t = reverseScan.next();
             assertEquals(tuples.get(i), SystemTestUtil.tupleToList(t));
         }
-        scan.close();
+        reverseScan.close();
         Database.getBufferPool().transactionComplete(tid);
     }
 
     /**
-     * Test that rewinding a BTreeScan iterator works with predicates.
+     * Test that rewinding a BTreeReverseScan iterator works with predicates.
      */
     @Test
     public void testRewindPredicates() throws IOException, DbException, TransactionAbortedException {
@@ -131,12 +118,12 @@ public class BTreeScanTest extends SimpleDbTestBase {
         ArrayList<ArrayList<Integer>> tuples = new ArrayList<ArrayList<Integer>>();
         int keyField = r.nextInt(3);
         BTreeFile f = BTreeUtility.createRandomBTreeFile(3, 1000, null, tuples, keyField);
-        Collections.sort(tuples, new TupleComparator(keyField));
+        Collections.sort(tuples, new BTreeReverseScanTest.TupleComparator(keyField));
 
         // EQUALS
         TransactionId tid = new TransactionId();
         ArrayList<ArrayList<Integer>> tuplesFiltered = new ArrayList<ArrayList<Integer>>();
-        IndexPredicate ipred = new IndexPredicate(Op.EQUALS, new IntField(r.nextInt(BTreeUtility.MAX_RAND_VALUE)));
+        IndexPredicate ipred = new IndexPredicate(Predicate.Op.EQUALS, new IntField(r.nextInt(BTreeUtility.MAX_RAND_VALUE)));
         Iterator<ArrayList<Integer>> it = tuples.iterator();
         while (it.hasNext()) {
             ArrayList<Integer> tup = it.next();
@@ -145,25 +132,25 @@ public class BTreeScanTest extends SimpleDbTestBase {
             }
         }
 
-        BTreeScan scan = new BTreeScan(tid, f.getId(), "table", ipred);
-        scan.open();
-        for (int i = 0; i < tuplesFiltered.size(); ++i) {
-            assertTrue(scan.hasNext());
-            Tuple t = scan.next();
+        BTreeReverseScan reverseScan = new BTreeReverseScan(tid, f.getId(), "table", ipred);
+        reverseScan.open();
+        for (int i = tuplesFiltered.size() - 1; i >= 0; --i) {
+            assertTrue(reverseScan.hasNext());
+            Tuple t = reverseScan.next();
             assertEquals(tuplesFiltered.get(i), SystemTestUtil.tupleToList(t));
         }
 
-        scan.rewind();
-        for (int i = 0; i < tuplesFiltered.size(); ++i) {
-            assertTrue(scan.hasNext());
-            Tuple t = scan.next();
+        reverseScan.rewind();
+        for (int i = tuplesFiltered.size() - 1; i >= 0; --i) {
+            assertTrue(reverseScan.hasNext());
+            Tuple t = reverseScan.next();
             assertEquals(tuplesFiltered.get(i), SystemTestUtil.tupleToList(t));
         }
-        scan.close();
+        reverseScan.close();
 
         // LESS_THAN
         tuplesFiltered.clear();
-        ipred = new IndexPredicate(Op.LESS_THAN, new IntField(r.nextInt(BTreeUtility.MAX_RAND_VALUE)));
+        ipred = new IndexPredicate(Predicate.Op.LESS_THAN, new IntField(r.nextInt(BTreeUtility.MAX_RAND_VALUE)));
         it = tuples.iterator();
         while (it.hasNext()) {
             ArrayList<Integer> tup = it.next();
@@ -172,25 +159,25 @@ public class BTreeScanTest extends SimpleDbTestBase {
             }
         }
 
-        scan = new BTreeScan(tid, f.getId(), "table", ipred);
-        scan.open();
-        for (int i = 0; i < tuplesFiltered.size(); ++i) {
-            assertTrue(scan.hasNext());
-            Tuple t = scan.next();
+        reverseScan = new BTreeReverseScan(tid, f.getId(), "table", ipred);
+        reverseScan.open();
+        for (int i = tuplesFiltered.size() - 1; i >= 0; --i) {
+            assertTrue(reverseScan.hasNext());
+            Tuple t = reverseScan.next();
             assertEquals(tuplesFiltered.get(i), SystemTestUtil.tupleToList(t));
         }
 
-        scan.rewind();
-        for (int i = 0; i < tuplesFiltered.size(); ++i) {
-            assertTrue(scan.hasNext());
-            Tuple t = scan.next();
+        reverseScan.rewind();
+        for (int i = tuplesFiltered.size() - 1; i >= 0; --i) {
+            assertTrue(reverseScan.hasNext());
+            Tuple t = reverseScan.next();
             assertEquals(tuplesFiltered.get(i), SystemTestUtil.tupleToList(t));
         }
-        scan.close();
+        reverseScan.close();
 
         // GREATER_THAN
         tuplesFiltered.clear();
-        ipred = new IndexPredicate(Op.GREATER_THAN_OR_EQ, new IntField(r.nextInt(BTreeUtility.MAX_RAND_VALUE)));
+        ipred = new IndexPredicate(Predicate.Op.GREATER_THAN_OR_EQ, new IntField(r.nextInt(BTreeUtility.MAX_RAND_VALUE)));
         it = tuples.iterator();
         while (it.hasNext()) {
             ArrayList<Integer> tup = it.next();
@@ -199,21 +186,21 @@ public class BTreeScanTest extends SimpleDbTestBase {
             }
         }
 
-        scan = new BTreeScan(tid, f.getId(), "table", ipred);
-        scan.open();
-        for (int i = 0; i < tuplesFiltered.size(); ++i) {
-            assertTrue(scan.hasNext());
-            Tuple t = scan.next();
+        reverseScan = new BTreeReverseScan(tid, f.getId(), "table", ipred);
+        reverseScan.open();
+        for (int i = tuplesFiltered.size() - 1; i >= 0; --i) {
+            assertTrue(reverseScan.hasNext());
+            Tuple t = reverseScan.next();
             assertEquals(tuplesFiltered.get(i), SystemTestUtil.tupleToList(t));
         }
 
-        scan.rewind();
-        for (int i = 0; i < tuplesFiltered.size(); ++i) {
-            assertTrue(scan.hasNext());
-            Tuple t = scan.next();
+        reverseScan.rewind();
+        for (int i = tuplesFiltered.size() - 1; i >= 0; --i) {
+            assertTrue(reverseScan.hasNext());
+            Tuple t = reverseScan.next();
             assertEquals(tuplesFiltered.get(i), SystemTestUtil.tupleToList(t));
         }
-        scan.close();
+        reverseScan.close();
         Database.getBufferPool().transactionComplete(tid);
     }
 
@@ -228,15 +215,15 @@ public class BTreeScanTest extends SimpleDbTestBase {
         ArrayList<ArrayList<Integer>> tuples = new ArrayList<ArrayList<Integer>>();
         int keyField = 0;
         BTreeFile f = BTreeUtility.createBTreeFile(2, LEAF_PAGES * 502, null, tuples, keyField);
-        Collections.sort(tuples, new TupleComparator(keyField));
+        Collections.sort(tuples, new BTreeReverseScanTest.TupleComparator(keyField));
         TupleDesc td = Utility.getTupleDesc(2);
-        InstrumentedBTreeFile table = new InstrumentedBTreeFile(f.getFile(), keyField, td);
+        BTreeReverseScanTest.InstrumentedBTreeFile table = new BTreeReverseScanTest.InstrumentedBTreeFile(f.getFile(), keyField, td);
         Database.getCatalog().addTable(table, SystemTestUtil.getUUID());
 
         // EQUALS
         TransactionId tid = new TransactionId();
         ArrayList<ArrayList<Integer>> tuplesFiltered = new ArrayList<ArrayList<Integer>>();
-        IndexPredicate ipred = new IndexPredicate(Op.EQUALS, new IntField(r.nextInt(LEAF_PAGES * 502)));
+        IndexPredicate ipred = new IndexPredicate(Predicate.Op.EQUALS, new IntField(r.nextInt(LEAF_PAGES * 502)));
         Iterator<ArrayList<Integer>> it = tuples.iterator();
         while (it.hasNext()) {
             ArrayList<Integer> tup = it.next();
@@ -247,14 +234,14 @@ public class BTreeScanTest extends SimpleDbTestBase {
 
         Database.resetBufferPool(BufferPool.DEFAULT_PAGES);
         table.readCount = 0;
-        BTreeScan scan = new BTreeScan(tid, f.getId(), "table", ipred);
-        SystemTestUtil.matchTuples(scan, tuplesFiltered);
+        BTreeReverseScan reverseScan = new BTreeReverseScan(tid, f.getId(), "table", ipred);
+        SystemTestUtil.matchTuples(reverseScan, tuplesFiltered);
         // root pointer page + root + leaf page (possibly 2 leaf pages)
         assertTrue(table.readCount == 3 || table.readCount == 4);
 
         // LESS_THAN
         tuplesFiltered.clear();
-        ipred = new IndexPredicate(Op.LESS_THAN, new IntField(r.nextInt(LEAF_PAGES * 502)));
+        ipred = new IndexPredicate(Predicate.Op.LESS_THAN, new IntField(r.nextInt(LEAF_PAGES * 502)));
         it = tuples.iterator();
         while (it.hasNext()) {
             ArrayList<Integer> tup = it.next();
@@ -265,8 +252,8 @@ public class BTreeScanTest extends SimpleDbTestBase {
 
         Database.resetBufferPool(BufferPool.DEFAULT_PAGES);
         table.readCount = 0;
-        scan = new BTreeScan(tid, f.getId(), "table", ipred);
-        SystemTestUtil.matchTuples(scan, tuplesFiltered);
+        reverseScan = new BTreeReverseScan(tid, f.getId(), "table", ipred);
+        SystemTestUtil.matchTuples(reverseScan, tuplesFiltered);//此处table.readCount从0变成了32
         // root pointer page + root + leaf pages
         int leafPageCount = tuplesFiltered.size() / 502;
         if (leafPageCount < LEAF_PAGES)
@@ -275,7 +262,7 @@ public class BTreeScanTest extends SimpleDbTestBase {
 
         // GREATER_THAN
         tuplesFiltered.clear();
-        ipred = new IndexPredicate(Op.GREATER_THAN_OR_EQ, new IntField(r.nextInt(LEAF_PAGES * 502)));
+        ipred = new IndexPredicate(Predicate.Op.GREATER_THAN_OR_EQ, new IntField(r.nextInt(LEAF_PAGES * 502)));
         it = tuples.iterator();
         while (it.hasNext()) {
             ArrayList<Integer> tup = it.next();
@@ -286,8 +273,8 @@ public class BTreeScanTest extends SimpleDbTestBase {
 
         Database.resetBufferPool(BufferPool.DEFAULT_PAGES);
         table.readCount = 0;
-        scan = new BTreeScan(tid, f.getId(), "table", ipred);
-        SystemTestUtil.matchTuples(scan, tuplesFiltered);
+        reverseScan = new BTreeReverseScan(tid, f.getId(), "table", ipred);
+        SystemTestUtil.matchTuples(reverseScan, tuplesFiltered);
         // root pointer page + root + leaf pages
         leafPageCount = tuplesFiltered.size() / 502;
         if (leafPageCount < LEAF_PAGES)
@@ -301,6 +288,6 @@ public class BTreeScanTest extends SimpleDbTestBase {
      * Make test compatible with older version of ant.
      */
     public static junit.framework.Test suite() {
-        return new junit.framework.JUnit4TestAdapter(BTreeScanTest.class);
+        return new junit.framework.JUnit4TestAdapter(BTreeReverseScanTest.class);
     }
 }

@@ -6,7 +6,7 @@ import java.util.*;
  * BTreeScan is an operator which reads tuples in sorted order
  * according to a predicate
  */
-public class BTreeScan implements OpIterator {
+public class BTreeReverseScan implements OpIterator {
 
     private static final long serialVersionUID = 1L;
 
@@ -33,7 +33,7 @@ public class BTreeScan implements OpIterator {
      * @param ipred      The index predicate to match. If null, the scan will return all tuples
      *                   in sorted order
      */
-    public BTreeScan(TransactionId tid, int tableid, String tableAlias, IndexPredicate ipred) {
+    public BTreeReverseScan(TransactionId tid, int tableid, String tableAlias, IndexPredicate ipred) {
         this.tid = tid;
         this.ipred = ipred;
         reset(tableid, tableAlias);
@@ -70,9 +70,9 @@ public class BTreeScan implements OpIterator {
         this.alias = tableAlias;
         this.tablename = Database.getCatalog().getTableName(tableid);
         if (ipred == null) {
-            this.it = Database.getCatalog().getDatabaseFile(tableid).iterator(tid);
+            this.it = ((BTreeFile) Database.getCatalog().getDatabaseFile(tableid)).reverseIterator(tid);
         } else {
-            this.it = ((BTreeFile) Database.getCatalog().getDatabaseFile(tableid)).indexIterator(tid, ipred);
+            this.it = ((BTreeFile) Database.getCatalog().getDatabaseFile(tableid)).indexReverseIterator(tid, ipred);
         }
         myTd = Database.getCatalog().getTupleDesc(tableid);
         String[] newNames = new String[myTd.numFields()];
@@ -87,7 +87,7 @@ public class BTreeScan implements OpIterator {
         myTd = new TupleDesc(newTypes, newNames);
     }
 
-    public BTreeScan(TransactionId tid, int tableid, IndexPredicate ipred) {
+    public BTreeReverseScan(TransactionId tid, int tableid, IndexPredicate ipred) {
         this(tid, tableid, Database.getCatalog().getTableName(tableid), ipred);
     }
 
