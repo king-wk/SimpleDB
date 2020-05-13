@@ -37,8 +37,7 @@ public class BufferPool {
     private HashMap<PageId, Page> pageId;
     //页的最大数量
     private int MAX_Page;
-    private TransactionId transactionId;
-    private Permissions permissions;
+    private LockManager lockManager;
 
     /**
      * Creates a BufferPool that caches up to numPages pages.
@@ -49,6 +48,7 @@ public class BufferPool {
         // some code goes here
         MAX_Page = numPages;
         pageId = new HashMap<>(MAX_Page);
+        lockManager = new LockManager();
     }
 
     public static int getPageSize() {
@@ -82,8 +82,15 @@ public class BufferPool {
      */
     public Page getPage(TransactionId tid, PageId pid, Permissions perm) throws TransactionAbortedException, DbException {
         // some code goes here
-        this.transactionId = tid;
-        this.permissions = perm;
+        boolean state = lockManager.Lock(pid, tid, perm);
+        while (!state) {
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            state = lockManager.Lock(pid, tid, perm);
+        }
         //不知道这个方法里的tid和perm的作用，好像不影响
         if (pageId.containsKey(pid)) {//判断要返回的page是否已存在
             return pageId.get(pid);//如果存在直接返回page
@@ -94,6 +101,9 @@ public class BufferPool {
                 this.evictPage();
             }
             pageId.put(pid, newPage);//把新的page放入
+            if (perm == Permissions.READ_WRITE) {
+                newPage.markDirty(true, tid);
+            }
             return newPage;
         }
     }
@@ -110,6 +120,7 @@ public class BufferPool {
     public void releasePage(TransactionId tid, PageId pid) {
         // some code goes here
         // not necessary for lab1|lab2
+        lockManager.releaseLock(tid, pid);
     }
 
     /**
@@ -128,7 +139,7 @@ public class BufferPool {
     public boolean holdsLock(TransactionId tid, PageId p) {
         // some code goes here
         // not necessary for lab1|lab2
-        return false;
+        return lockManager.holdsLock(tid, p);
     }
 
     /**
@@ -166,6 +177,9 @@ public class BufferPool {
         DbFile heapFile = Database.getCatalog().getDatabaseFile(tableId);
         ArrayList<Page> pages = heapFile.insertTuple(tid, t);
         for (Page page : pages) {
+            if (!pageId.containsKey(page.getId()) && pageId.size() == MAX_Page) {
+                evictPage();
+            }
             page.markDirty(true, tid);
             pageId.put(page.getId(), page);
         }
@@ -191,6 +205,9 @@ public class BufferPool {
         DbFile heapFile = Database.getCatalog().getDatabaseFile(t.getRecordId().getPageId().getTableId());
         ArrayList<Page> pages = heapFile.deleteTuple(tid, t);
         for (Page page : pages) {
+            if (!pageId.containsKey(page.getId()) && pageId.size() == MAX_Page) {
+                evictPage();
+            }
             page.markDirty(true, tid);
             pageId.put(page.getId(), page);
         }
@@ -232,15 +249,11 @@ public class BufferPool {
     private synchronized void flushPage(PageId pid) throws IOException {
         // some code goes here
         // not necessary for lab1
-        try {
-            Page page = getPage(transactionId, pid, permissions);
-            if (page != null && page.isDirty() != null) {
-                DbFile heapFile = Database.getCatalog().getDatabaseFile(pid.getTableId());
-                heapFile.writePage(page);
-                page.markDirty(false, null);
-            }
-        } catch (TransactionAbortedException | DbException e) {
-            e.printStackTrace();
+        Page page = pageId.get(pid);
+        if (page != null && page.isDirty() != null) {
+            DbFile heapFile = Database.getCatalog().getDatabaseFile(pid.getTableId());
+            heapFile.writePage(page);
+            page.markDirty(false, null);
         }
     }
 
@@ -252,7 +265,7 @@ public class BufferPool {
         // not necessary for lab1|lab2
         for (PageId pid : pageId.keySet()) {
             Page p = pageId.get(pid);
-            if (p != null && p.isDirty().equals(tid)) {
+            if (p.isDirty() != null && p.isDirty().equals(tid)) {
                 flushPage(pid);
             }
         }

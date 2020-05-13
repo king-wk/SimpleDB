@@ -117,31 +117,29 @@ public class HeapFile implements DbFile {
             throws DbException, IOException, TransactionAbortedException {
         // some code goes here
         // not necessary for lab1
+        HeapPage heapPage = null;
         ArrayList<Page> pages = new ArrayList<>();
         //找有空闲的slot的page
-        for (int i = 0; i < numPages(); i++) {
+        int i;
+        for (i = 0; i < numPages(); i++) {
             //获取对应page
-            HeapPageId pageId = new HeapPageId(getId(), i);
-            HeapPage heapPage = (HeapPage) Database.getBufferPool().getPage(tid, pageId, Permissions.READ_WRITE);
+            heapPage = (HeapPage) Database.getBufferPool().getPage(tid, new HeapPageId(getId(), i), Permissions.READ_ONLY);
             //判断page中是否有空slot可以插入tuple
-            if (heapPage.getNumEmptySlots() != 0) {
-                heapPage.insertTuple(t);
-                //page进行了修改，将page标记成脏页
-                heapPage.markDirty(true, tid);
-                pages.add(heapPage);
+            if (heapPage.getNumEmptySlots() > 0) {
                 break;
             }
         }
         //如果page都已经满了
-        if (pages.size() == 0) {
+        if (i == numPages()) {
             //创建一个新的page
-            HeapPageId NewPageId = new HeapPageId(getId(), numPages());
-            HeapPage page = new HeapPage(NewPageId, HeapPage.createEmptyPageData());
-            page.insertTuple(t);
-            pages.add(page);
+            heapPage = new HeapPage(new HeapPageId(getId(), i), HeapPage.createEmptyPageData());
             //写入磁盘
-            writePage(page);
+            writePage(heapPage);
         }
+        heapPage = (HeapPage) Database.getBufferPool().getPage(tid, new HeapPageId(getId(), i), Permissions.READ_WRITE);
+        heapPage.insertTuple(t);
+        heapPage.markDirty(true, tid);
+        pages.add(heapPage);
         return pages;
     }
 
@@ -152,19 +150,20 @@ public class HeapFile implements DbFile {
         // not necessary for lab1
         PageId pageId = t.getRecordId().getPageId();
         ArrayList<Page> pages = new ArrayList<>();
-        for (int i = 0; i < numPages(); i++) {
+        //for (int i = 0; i < numPages(); i++) {
+        if (pageId.getPageNumber() >= 0 && pageId.getPageNumber() < numPages()) {
             HeapPage heapPage = (HeapPage) Database.getBufferPool().getPage(tid, pageId, Permissions.READ_WRITE);
             //找到要删除的tuple所在的page
-            if (i == pageId.getPageNumber()) {
-                heapPage.deleteTuple(t);
-                heapPage.markDirty(true, tid);
-                pages.add(heapPage);
-                break;
-            }
+            //if (i == pageId.getPageNumber()) {
+            heapPage.deleteTuple(t);
+            heapPage.markDirty(true, tid);
+            pages.add(heapPage);
+            //break;
+            //}
         }
-        if (pages.size() == 0) {
-            throw new DbException("the tuple cannot be deleted or the tuple is not in all pages");
-        }
+        //if (pages.size() == 0) {
+        //throw new DbException("the tuple cannot be deleted or the tuple is not in all pages");
+        //}
         return pages;
     }
 
