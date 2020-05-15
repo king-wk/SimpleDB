@@ -82,14 +82,14 @@ public class BufferPool {
      */
     public Page getPage(TransactionId tid, PageId pid, Permissions perm) throws TransactionAbortedException, DbException {
         // some code goes here
-        boolean state = lockManager.Lock(pid, tid, perm);
+        boolean state = lockManager.acquireLock(tid, pid, perm);
         while (!state) {
             try {
                 Thread.sleep(10);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-            state = lockManager.Lock(pid, tid, perm);
+            state = lockManager.acquireLock(tid, pid, perm);
         }
         //不知道这个方法里的tid和perm的作用，好像不影响
         if (pageId.containsKey(pid)) {//判断要返回的page是否已存在
@@ -101,6 +101,7 @@ public class BufferPool {
                 this.evictPage();
             }
             pageId.put(pid, newPage);//把新的page放入
+            pageId.get(pid).setBeforeImage();
             if (perm == Permissions.READ_WRITE) {
                 newPage.markDirty(true, tid);
             }
@@ -131,6 +132,7 @@ public class BufferPool {
     public void transactionComplete(TransactionId tid) throws IOException {
         // some code goes here
         // not necessary for lab1|lab2
+        transactionComplete(tid, true);
     }
 
     /**
@@ -153,6 +155,20 @@ public class BufferPool {
             throws IOException {
         // some code goes here
         // not necessary for lab1|lab2
+        try {
+            for (PageId pid : pageId.keySet()) {
+                if (pageId.get(pid).isDirty() != null && pageId.get(pid).isDirty().equals(tid)) {
+                    if (commit) {
+                        flushPage(pid);
+                    } else {
+                        pageId.put(pid, pageId.get(pid).getBeforeImage());
+                    }
+                }
+            }
+        } catch (NullPointerException e) {
+            e.printStackTrace();
+        }
+        lockManager.releaseAllLocks(tid);
     }
 
     /**
@@ -254,6 +270,7 @@ public class BufferPool {
             DbFile heapFile = Database.getCatalog().getDatabaseFile(pid.getTableId());
             heapFile.writePage(page);
             page.markDirty(false, null);
+            page.setBeforeImage();
         }
     }
 
@@ -267,6 +284,9 @@ public class BufferPool {
             Page p = pageId.get(pid);
             if (p.isDirty() != null && p.isDirty().equals(tid)) {
                 flushPage(pid);
+                if (p.isDirty() == null) {
+                    p.setBeforeImage();
+                }
             }
         }
     }

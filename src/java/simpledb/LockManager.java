@@ -4,206 +4,292 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
- *
+ * The lock manager
+ * which records the transactions and lock types for each page,
+ * as well as the transactions that are waiting
  */
 public class LockManager {
-    //页面对应有共享锁的事务
     private HashMap<PageId, List<TransactionId>> sharers;
-    //页面对应排他锁的事务
     private HashMap<PageId, TransactionId> owners;
-    //事务对应有共享锁的page
-    //private HashMap<TransactionId, List<PageId>> sharePages;
-    //事务对应有排他锁的page
-    //private HashMap<TransactionId, List<PageId>> ownPages;
+    private HashMap<TransactionId, List<PageId>> sharedPages;
+    private HashMap<TransactionId, List<PageId>> ownedPages;
     private HashMap<PageId, List<TransactionId>> waiters;
-    //private HashMap<TransactionId,PageId>waitPages;
-    //private HashMap<PageId,TransactionId>waitingInfo;
-
+    private HashMap<TransactionId, List<PageId>> waitedPages;
 
     public LockManager() {
         sharers = new HashMap<PageId, List<TransactionId>>();
         owners = new HashMap<PageId, TransactionId>();
-        //sharePages = new HashMap<TransactionId, List<PageId>>();
-        //ownPages = new HashMap<TransactionId, List<PageId>>();
+        sharedPages = new HashMap<TransactionId, List<PageId>>();
+        ownedPages = new HashMap<TransactionId, List<PageId>>();
         waiters = new HashMap<PageId, List<TransactionId>>();
-        //waitPages=new HashMap<TransactionId, PageId>();
-        //waitingInfo=new HashMap<PageId, TransactionId>();
+        waitedPages = new HashMap<TransactionId, List<PageId>>();
     }
 
     /**
-     * @param pageId
-     * @param transactionId
-     * @return
+     * A specific transaction requests to lock a specified page
+     * If the permission is READ_ONLY, require a shared lock,
+     * if the permission is READ_WRITE, require an exclusive lock
+     * If a transaction requests a lock that it should not be granted,
+     * your code should block, waiting for that lock to become available
+     *
+     * @param tid  the ID of the specified transaction
+     * @param pid  the ID of the specified page
+     * @param perm permission to determine lock type
+     * @return return true if successfully acquired a lock
+     * @throws TransactionAbortedException
      */
-    private boolean acquireXLock(PageId pageId, TransactionId transactionId) {
-        List<TransactionId> sharer = sharers.get(pageId);
-        TransactionId owner = owners.get(pageId);
-        //如果这个page已经有了一个排他锁，而且不是这个事务加的排他锁，那么申请失败
-        if (owner != null && !owner.equals(transactionId)) {
-            return false;
-        }
-        //如果这个page已经有多个或者一个但是不是该事务加的共享锁，必须等这些共享锁释放才能加排他锁，申请失败
-        if (sharer != null && (sharer.size() > 1 || (sharer.size() == 1 && !sharer.contains(transactionId)))) {
-            return false;
-        }
-        //该事务是这个page上有共享锁的唯一事务
-        //将共享锁升级为排他锁
-        if (sharer != null) {
-            removeSharer(pageId, transactionId);
-        }
-        addOwner(pageId, transactionId);
-        return true;
-    }
-
-    /**
-     * @param pageId
-     * @param transactionId
-     * @return
-     */
-    private boolean acquireSLock(PageId pageId, TransactionId transactionId) {
-        TransactionId owner = owners.get(pageId);
-        if (owner != null && !owner.equals(transactionId)) {
-            return false;
-        }
-        if (owner == null) {
-            addSharer(pageId, transactionId);
-        }
-        return true;
-    }
-
-    /**
-     * @param pageId
-     * @param transactionId
-     */
-    private void addSharer(PageId pageId, TransactionId transactionId) {
-        List<TransactionId> sharer = sharers.get(pageId);
-        if (sharer == null) {
-            sharer = new ArrayList<TransactionId>();
-        }
-        sharer.add(transactionId);
-        sharers.put(pageId, sharer);
-        //List<PageId> sharePage = sharePages.get(transactionId);
-        //if (sharePage == null) {
-        //    sharePage = new ArrayList<PageId>();
-        //}
-        //sharePage.add(pageId);
-        //sharePages.put(transactionId, sharePage);
-    }
-
-    /**
-     * @param pageId
-     * @param transactionId
-     */
-    private void removeSharer(PageId pageId, TransactionId transactionId) {
-        List<TransactionId> sharer = sharers.get(pageId);
-        sharer.remove(transactionId);
-        if (sharer.size() == 0) {
-            sharers.remove(pageId);
-        } else {
-            sharers.put(pageId, sharer);
-        }
-        //List<PageId> sharePage = sharePages.get(transactionId);
-        //sharePage.remove(pageId);
-        //if (sharePage.size() == 0) {
-        //    sharePages.remove(transactionId);
-        //} else {
-        //    sharePages.put(transactionId, sharePage);
-        //}
-    }
-
-    /**
-     * @param pageId
-     * @param transactionId
-     */
-    private void addOwner(PageId pageId, TransactionId transactionId) {
-        owners.put(pageId, transactionId);
-        //List<PageId> ownPage = ownPages.get(transactionId);
-        //if (ownPage == null) {
-        //    ownPage = new ArrayList<PageId>();
-        //}
-        //ownPage.add(pageId);
-        //ownPages.put(transactionId, ownPage);
-    }
-
-    /**
-     * @param pageId
-     * @param transactionId
-     */
-    private void removeOwner(PageId pageId, TransactionId transactionId) {
-        owners.remove(pageId);
-    }
-
-
-    /**
-     * @param pageId
-     * @param transactionId
-     * @param permissions
-     * @return
-     */
-    public synchronized boolean Lock(PageId pageId, TransactionId transactionId, Permissions permissions) throws TransactionAbortedException {
+    public synchronized boolean acquireLock(TransactionId tid, PageId pid, Permissions perm)
+            throws TransactionAbortedException {
         boolean state = false;
-        if (Permissions.READ_WRITE.equals(permissions)) {
-            state = acquireXLock(pageId, transactionId);
-        } else if (Permissions.READ_ONLY.equals(permissions)) {
-            state = acquireSLock(pageId, transactionId);
+        if (perm.equals(Permissions.READ_WRITE)) {
+            state = acquireExclusiveLock(tid, pid);
+        } else if (perm.equals(Permissions.READ_ONLY)) {
+            state = acquireSharedLock(tid, pid);
         } else {
             throw new TransactionAbortedException();
         }
         if (state) {
-            if (waiters.containsKey(pageId)) {
-                List<TransactionId> waiter = waiters.get(pageId);
-                if (waiter.contains(transactionId)) {
-                    waiter.remove(transactionId);
-                }
-                if (waiter.size() == 0) {
-                    waiters.remove(pageId);
-                } else {
-                    waiters.put(pageId, waiter);
-                }
-            }
+            removeWaiter(tid, pid);
             return true;
         } else {
-            if (!waiters.containsKey(pageId)) {
-                waiters.put(pageId, new ArrayList<TransactionId>());
-            }
-            List<TransactionId> waiter = waiters.get(pageId);
-            if (!waiter.contains(transactionId)) {
-                waiter.add(transactionId);
-            }
-            waiters.put(pageId, waiter);
-        }
-        return false;
-    }
-
-    /**
-     * @param transactionId the ID of the transaction requesting the unlock
-     * @param pageId        the ID of the page to unlock
-     */
-    public synchronized void releaseLock(TransactionId transactionId, PageId pageId) {
-        if (sharers.containsKey(pageId)) {
-            List<TransactionId> list = sharers.get(pageId);
-            if (list.contains(transactionId)) {
-                removeSharer(pageId, transactionId);
-            }
-        }
-        if (owners.get(pageId).equals(transactionId)) {
-            removeOwner(pageId, transactionId);
+            addWaiter(tid, pid);
+            return false;
         }
     }
 
     /**
      * Return true if the specified transaction has a lock on the specified page
      *
-     * @param transactionId
-     * @param pageId
-     * @return
+     * @param tid the ID of the specified transaction
+     * @param pid the ID of the specified page
+     * @return Return true if the specified transaction has a lock on the specified page
      */
-    public synchronized boolean holdsLock(TransactionId transactionId, PageId pageId) {
-        if (sharers.get(pageId).contains(transactionId) || owners.get(pageId).equals(transactionId)) {
+    public synchronized boolean holdsLock(TransactionId tid, PageId pid) {
+        List<TransactionId> sharer = sharers.get(pid);
+        if (sharer != null && sharer.contains(tid)) {
+            return true;
+        }
+        TransactionId owner = owners.get(pid);
+        if (owner != null && owner.equals(tid)) {
             return true;
         }
         return false;
+    }
+
+    /**
+     * Add a shared lock for the specified transaction on the specified page
+     *
+     * @param tid the ID of the specified transaction
+     * @param pid the ID of the specified page
+     */
+    private void addSharer(TransactionId tid, PageId pid) {
+        List<TransactionId> sharer = sharers.get(pid);
+        if (sharer == null) {
+            sharer = new ArrayList<>();
+        }
+        sharer.add(tid);
+        sharers.put(pid, sharer);
+        List<PageId> sharedPage = sharedPages.get(tid);
+        if (sharedPage == null) {
+            sharedPage = new ArrayList<>();
+        }
+        sharedPage.add(pid);
+        sharedPages.put(tid, sharedPage);
+    }
+
+    /**
+     * Add an exclusive lock for the specified transaction on the specified page
+     *
+     * @param tid the ID of the specified transaction
+     * @param pid the ID of the specified page
+     */
+    private void addOwner(TransactionId tid, PageId pid) {
+        owners.put(pid, tid);
+        List<PageId> ownedPage = ownedPages.get(tid);
+        if (ownedPage == null) {
+            ownedPage = new ArrayList<>();
+        }
+        ownedPage.add(pid);
+        ownedPages.put(tid, ownedPage);
+    }
+
+    /**
+     * Add a waitingInfo for the specified transaction on the specified page
+     *
+     * @param tid the ID of the specified transaction
+     * @param pid the ID of the specified page
+     */
+    private void addWaiter(TransactionId tid, PageId pid) {
+        List<TransactionId> waiter = waiters.get(pid);
+        if (waiter == null) {
+            waiter = new ArrayList<>();
+        }
+        waiter.add(tid);
+        waiters.put(pid, waiter);
+        List<PageId> waitedPage = waitedPages.get(tid);
+        if (waitedPage == null) {
+            waitedPage = new ArrayList<>();
+        }
+        waitedPage.add(pid);
+        waitedPages.put(tid, waitedPage);
+    }
+
+    /**
+     * Remove a shared lock for the specified transaction on the specified page
+     *
+     * @param tid the ID of the specified transaction
+     * @param pid the ID of the specified page
+     */
+    private void removeSharer(TransactionId tid, PageId pid) {
+        List<TransactionId> sharer = sharers.get(pid);
+        sharer.remove(tid);
+        if (sharer.size() == 0) {
+            sharers.remove(pid);
+        } else {
+            sharers.put(pid, sharer);
+        }
+        List<PageId> sharedPage = sharedPages.get(tid);
+        sharedPage.remove(pid);
+        if (sharedPage.size() == 0) {
+            sharedPages.remove(tid);
+        } else {
+            sharedPages.put(tid, sharedPage);
+        }
+    }
+
+    /**
+     * Remove an exclusive lock for the specified transaction on the specified page
+     *
+     * @param tid the ID of the specified transaction
+     * @param pid the ID of the specified page
+     */
+    private void removeOwner(TransactionId tid, PageId pid) {
+        owners.remove(pid);
+        List<PageId> ownedPage = ownedPages.get(tid);
+        ownedPage.remove(pid);
+        if (ownedPage.size() == 0) {
+            ownedPages.remove(tid);
+        } else {
+            ownedPages.put(tid, ownedPage);
+        }
+    }
+
+    /**
+     * Remove a waitingInfo for the specified transaction on the specified page
+     *
+     * @param tid the ID of the specified transaction
+     * @param pid the ID of the specified page
+     */
+    private void removeWaiter(TransactionId tid, PageId pid) {
+        List<TransactionId> waiter = waiters.get(pid);
+        if (waiter == null) {
+            return;
+        }
+        waiter.remove(tid);
+        if (waiter.size() == 0) {
+            waiters.remove(pid);
+        } else {
+            waiters.put(pid, waiter);
+        }
+        List<PageId> waitedPage = waitedPages.get(tid);
+        waitedPage.remove(pid);
+        if (waitedPage.size() == 0) {
+            waitedPages.remove(tid);
+        } else {
+            waitedPages.put(tid, waitedPage);
+        }
+    }
+
+    /**
+     * Require an exclusive lock for the specified transaction on the specified page
+     *
+     * @param tid the ID of the specified transaction
+     * @param pid the ID of the specified page
+     * @return return true if successfully acquired an exclusive lock
+     */
+    private boolean acquireExclusiveLock(TransactionId tid, PageId pid) {
+        List<TransactionId> sharer = sharers.get(pid);
+        TransactionId owner = owners.get(pid);
+        if (owner != null && !owner.equals(tid)) {
+            return false;
+        } else if (sharer != null && ((sharer.size() > 1) || (sharer.size() == 1 && !sharer.contains(tid)))) {
+            return false;
+        }
+        if (sharer != null) {
+            removeSharer(tid, pid);
+        }
+        addOwner(tid, pid);
+        return true;
+    }
+
+    /**
+     * Require a shared lock for the specified transaction on the specified page
+     *
+     * @param tid the ID of the specified transaction
+     * @param pid the ID of the specified page
+     * @return return true if successfully acquired a shared lock
+     */
+    private boolean acquireSharedLock(TransactionId tid, PageId pid) {
+        TransactionId owner = owners.get(pid);
+        if (owner != null && !owner.equals(tid)) {
+            return false;
+        } else if (owner == null) {
+            addSharer(tid, pid);
+        }
+        return true;
+    }
+
+    /**
+     * Releases the lock on a page.
+     *
+     * @param tid the ID of the transaction requesting the unlock
+     * @param pid the ID of the page to unlock
+     */
+    public synchronized void releaseLock(TransactionId tid, PageId pid) {
+        List<PageId> sharePage = sharedPages.get(tid);
+        if (sharePage != null && sharePage.contains(pid)) {
+            removeSharer(tid, pid);
+        }
+        List<PageId> ownPage = ownedPages.get(tid);
+        if (ownPage != null && ownPage.contains(pid)) {
+            removeOwner(tid, pid);
+        }
+    }
+
+    /**
+     * Release all locks associated with a given transaction.
+     *
+     * @param tid the ID of the transaction requesting the unlock
+     */
+    public synchronized void releaseAllLocks(TransactionId tid) {
+        if (sharedPages.get(tid) != null) {
+            for (PageId pid : sharedPages.get(tid)) {
+                List<TransactionId> sharer = sharers.get(pid);
+                sharer.remove(tid);
+                if (sharer.size() == 0) sharers.remove(pid);
+                else sharers.put(pid, sharer);
+            }
+            sharedPages.remove(tid);
+        }
+        if (ownedPages.get(tid) != null) {
+            for (PageId pid : ownedPages.get(tid)) {
+                owners.remove(pid);
+            }
+            ownedPages.remove(tid);
+        }
+        /*
+        if (waitedPages.get(tid) != null) {
+            for (PageId pid : waitedPages.get(tid)) {
+                List<TransactionId> waiter = waiters.get(pid);
+                waiter.remove(tid);
+                if (waiter.size() == 0) waiters.remove(pid);
+                else waiters.put(pid, waiter);
+            }
+            waitedPages.remove(tid);
+        }
+         */
     }
 }
