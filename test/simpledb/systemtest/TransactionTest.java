@@ -146,7 +146,7 @@ public class TransactionTest extends SimpleDbTestBase {
                 // Store exception for the master thread to handle
                 exception = e;
             }
-            
+
             try {
                 latch.notParticipating();
             } catch (InterruptedException e) {
@@ -157,22 +157,22 @@ public class TransactionTest extends SimpleDbTestBase {
             completed = true;
         }
     }
-    
+
     private static class ModifiableCyclicBarrier {
         private CountDownLatch awaitLatch;
         private CyclicBarrier participationLatch;
         private AtomicInteger nextParticipants;
-        
+
         public ModifiableCyclicBarrier(int parties) {
             reset(parties);
         }
-        
+
         private void reset(int parties) {
             nextParticipants = new AtomicInteger(0);
             awaitLatch = new CountDownLatch(parties);
             participationLatch = new CyclicBarrier(parties, new UpdateLatch(this, nextParticipants));
         }
-        
+
         public void await() throws InterruptedException, BrokenBarrierException {
             awaitLatch.countDown();
             awaitLatch.await();
@@ -190,7 +190,7 @@ public class TransactionTest extends SimpleDbTestBase {
         private static class UpdateLatch implements Runnable {
             ModifiableCyclicBarrier latch;
             AtomicInteger nextParticipants;
-            
+
             public UpdateLatch(ModifiableCyclicBarrier latch, AtomicInteger nextParticipants) {
                 this.latch = latch;
                 this.nextParticipants = nextParticipants;
@@ -202,10 +202,10 @@ public class TransactionTest extends SimpleDbTestBase {
                 if (participants > 0) {
                     latch.reset(participants);
                 }
-            }           
+            }
         }
     }
-    
+
     @Test public void testSingleThread()
             throws IOException, DbException, TransactionAbortedException {
         validateTransactions(1);
@@ -220,9 +220,9 @@ public class TransactionTest extends SimpleDbTestBase {
             throws IOException, DbException, TransactionAbortedException {
         validateTransactions(5);
     }
-    
+
     @Test public void testTenThreads()
-    throws IOException, DbException, TransactionAbortedException {
+            throws IOException, DbException, TransactionAbortedException {
         validateTransactions(10);
     }
 
