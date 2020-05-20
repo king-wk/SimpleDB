@@ -12,14 +12,17 @@ import java.util.Set;
  * as well as the transactions that are waiting
  */
 public class LockManager {
+    //跟踪page上的共享锁
     private HashMap<PageId, Set<TransactionId>> sharers;
+    //跟踪page上的排他锁
     private HashMap<PageId, TransactionId> owners;
     private HashMap<TransactionId, Set<PageId>> sharedPages;
     private HashMap<TransactionId, Set<PageId>> ownedPages;
+    //跟踪page上正在等待的事务
     private HashMap<PageId, Set<TransactionId>> waiters;
     private HashMap<TransactionId, Set<PageId>> waitedPages;
     //记录每个事务正在等待哪些事务的结束
-    private HashMap<TransactionId, List<TransactionId>> waitingInfo;
+    private HashMap<TransactionId, Set<TransactionId>> waitingInfo;
 
     public LockManager() {
         sharers = new HashMap<PageId, Set<TransactionId>>();
@@ -28,7 +31,7 @@ public class LockManager {
         ownedPages = new HashMap<TransactionId, Set<PageId>>();
         waiters = new HashMap<PageId, Set<TransactionId>>();
         waitedPages = new HashMap<TransactionId, Set<PageId>>();
-        waitingInfo = new HashMap<TransactionId, List<TransactionId>>();
+        waitingInfo = new HashMap<TransactionId, Set<TransactionId>>();
     }
 
     /**
@@ -45,21 +48,25 @@ public class LockManager {
      * @throws TransactionAbortedException
      */
     public synchronized boolean acquireLock(TransactionId tid, PageId pid, Permissions perm)
-            throws TransactionAbortedException {
+            throws TransactionAbortedException, DbException {
         boolean state = false;
         if (perm.equals(Permissions.READ_WRITE)) {
+            //如果Permissions对应READ_WRITE那么申请排他锁
             state = acquireExclusiveLock(tid, pid);
         } else if (perm.equals(Permissions.READ_ONLY)) {
+            //如果Permissions对应READ_ONLY那么申请共享锁
             state = acquireSharedLock(tid, pid);
         } else {
-            throw new TransactionAbortedException();
+            throw new DbException("");
         }
         if (state) {
+            // 如果加锁申请成功
             removeWaiter(tid, pid);
             return true;
         } else {
+            // 如果加锁申请失败
             addWaiter(tid, pid, perm);
-            List<TransactionId> transactionId = waitingInfo.get(tid);
+            Set<TransactionId> transactionId = waitingInfo.get(tid);
             for (TransactionId tid2 : transactionId) {
                 if (detectDeadLock(tid, tid2)) {
                     waitingInfo.remove(tid);
@@ -79,13 +86,16 @@ public class LockManager {
      */
     public synchronized boolean holdsLock(TransactionId tid, PageId pid) {
         Set<TransactionId> sharer = sharers.get(pid);
+        //如果存在tid在pid上的共享锁，返回true
         if (sharer != null && sharer.contains(tid)) {
             return true;
         }
         TransactionId owner = owners.get(pid);
+        //如果存在tid在pid上的排他锁，返回true
         if (owner != null && owner.equals(tid)) {
             return true;
         }
+        //如果既不存在共享锁也不存在排他锁，返回false
         return false;
     }
 
@@ -97,6 +107,8 @@ public class LockManager {
      */
     private void addSharer(TransactionId tid, PageId pid) {
         Set<TransactionId> sharer = sharers.get(pid);
+        // 如果pid对应的共享锁序列为空
+        // 那么说明pid上还没有共享锁
         if (sharer == null) {
             sharer = new HashSet<>();
         }
@@ -146,9 +158,9 @@ public class LockManager {
         }
         waitedPage.add(pid);
         waitedPages.put(tid, waitedPage);
-        List<TransactionId> waiting = waitingInfo.get(tid);
+        Set<TransactionId> waiting = waitingInfo.get(tid);
         if (waiting == null) {
-            waiting = new ArrayList<>();
+            waiting = new HashSet<>();
         }
         if (perm.equals(Permissions.READ_WRITE)) {
             Set<TransactionId> waitSharer = sharers.get(pid);
@@ -172,8 +184,11 @@ public class LockManager {
     private void removeSharer(TransactionId tid, PageId pid) {
         Set<TransactionId> sharer = sharers.get(pid);
         if (sharer != null) {
+            //删除pid上的tid的共享锁
             sharer.remove(tid);
             if (sharer.size() == 0) {
+                //如果删除tid的共享锁之后，pid上没有共享锁了
+                //在hashmap上删除这个pid
                 sharers.remove(pid);
             } else {
                 sharers.put(pid, sharer);
@@ -245,16 +260,27 @@ public class LockManager {
      * @return return true if successfully acquired an exclusive lock
      */
     private boolean acquireExclusiveLock(TransactionId tid, PageId pid) {
+        // page上已有的共享锁set
         Set<TransactionId> sharer = sharers.get(pid);
+        // page上的排他锁
         TransactionId owner = owners.get(pid);
         if (owner != null && !owner.equals(tid)) {
+            // 如果page上有不属于该事务的排他锁
+            // 那么需要等待这个排他锁写完才能授予该事务排他锁
             return false;
-        } else if (sharer != null && ((sharer.size() > 1) || (sharer.size() == 1 && !sharer.contains(tid)))) {
+        } else if (sharer != null && ((sharer.size() > 1) ||
+                (sharer.size() == 1 && !sharer.contains(tid)))) {
+            // 如果page上有共享锁：（1）有多把共享锁；（2）有一把共享锁但是不属于该事务
+            // 那么需要等待读锁结束才能写锁
             return false;
         }
         if (sharer != null) {
+            // 如果page上有该事务的共享锁
+            // 那么可以将共享锁升级为排他锁
+            // 删除pid上tid的共享锁
             removeSharer(tid, pid);
         }
+        // pid上添加tid的排他锁
         addOwner(tid, pid);
         return true;
     }
@@ -268,9 +294,11 @@ public class LockManager {
      */
     private boolean acquireSharedLock(TransactionId tid, PageId pid) {
         TransactionId owner = owners.get(pid);
+        // 如果page上有排他锁并且排他锁不属于该事务，那么不能申请共享锁
         if (owner != null && !owner.equals(tid)) {
             return false;
         } else if (owner == null) {
+            //如果没有排他锁，那么共享锁申请成功
             addSharer(tid, pid);
         }
         return true;
@@ -337,7 +365,7 @@ public class LockManager {
         if (tid1.equals(tid2)) {
             return true;
         } else {
-            List<TransactionId> tid = waitingInfo.get(tid2);
+            Set<TransactionId> tid = waitingInfo.get(tid2);
             if (tid == null) {
                 return false;
             } else {

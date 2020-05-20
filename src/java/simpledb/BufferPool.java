@@ -84,29 +84,25 @@ public class BufferPool {
     public Page getPage(TransactionId tid, PageId pid, Permissions perm) throws TransactionAbortedException, DbException {
         // some code goes here
         boolean state = lockManager.acquireLock(tid, pid, perm);
-        long start = System.currentTimeMillis();
+        // 如果申请加锁失败
         while (!state) {
-            long end = System.currentTimeMillis();
-            if (end - start > 20200) {
-                throw new TransactionAbortedException();
-            }
             try {
-                Thread.sleep(WAIT_TIME);
+                // 每隔10毫秒申请一次，直到申请成功
+                Thread.sleep(10);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
             state = lockManager.acquireLock(tid, pid, perm);
         }
-        //不知道这个方法里的tid和perm的作用，好像不影响
-        if (pageId.containsKey(pid)) {//判断要返回的page是否已存在
-            return pageId.get(pid);//如果存在直接返回page
-        } else {//如果不存在，把需要返回的page加进去，再返回对应page
-            DbFile table = Database.getCatalog().getDatabaseFile(pid.getTableId());//找到tableid对应的table
+        if (pageId.containsKey(pid)) {// 判断要返回的page是否已存在
+            return pageId.get(pid);// 如果存在直接返回page
+        } else {// 如果不存在，把需要返回的page加进去，再返回对应page
+            DbFile table = Database.getCatalog().getDatabaseFile(pid.getTableId());// 找到tableid对应的table
             Page newPage = table.readPage(pid);
-            if (pageId.size() == MAX_Page) {//判断缓冲池里是否还有空间，如果没有空间，就清除最后一个page
+            if (pageId.size() == MAX_Page) {// 判断缓冲池里是否还有空间，如果没有空间，就清除最后一个page
                 this.evictPage();
             }
-            pageId.put(pid, newPage);//把新的page放入
+            pageId.put(pid, newPage);// 把新的page放入
             pageId.get(pid).setBeforeImage();
             if (perm == Permissions.READ_WRITE) {
                 newPage.markDirty(true, tid);
@@ -163,10 +159,14 @@ public class BufferPool {
         // not necessary for lab1|lab2
         try {
             for (PageId pid : pageId.keySet()) {
-                if (pageId.get(pid).isDirty() != null && pageId.get(pid).isDirty().equals(tid)) {
+                // 遍历缓冲池中的page，如果是对应脏页
+                if (pageId.get(pid).isDirty() != null &&
+                        pageId.get(pid).isDirty().equals(tid)) {
+                    // 如果事务是提交，刷新page
                     if (commit) {
                         flushPage(pid);
                     } else {
+                        // 如果是中止事务，将页面恢复到其磁盘状态来还原事务所做的任何更改
                         pageId.put(pid, pageId.get(pid).getBeforeImage());
                     }
                 }
@@ -174,6 +174,7 @@ public class BufferPool {
         } catch (NullPointerException e) {
             e.printStackTrace();
         }
+        // 释放该事务持有的所有锁
         lockManager.releaseAllLocks(tid);
     }
 
@@ -310,10 +311,11 @@ public class BufferPool {
                 cleanPages.add(pid);
             }
         }
-        if (cleanPages.size() == 0) throw new DbException("No clean pages to evict!");
+        if (cleanPages.size() == 0) {
+            throw new DbException("");
+        }
         PageId vic = cleanPages.get(cleanPages.size() - 1);
         try {
-            assert pageId.get(vic).isDirty() == null : "Evict a dirty page!";
             flushPage(vic);
         } catch (Exception e) {
             e.printStackTrace();

@@ -123,7 +123,8 @@ public class HeapFile implements DbFile {
         int i;
         for (i = 0; i < numPages(); i++) {
             //获取对应page
-            heapPage = (HeapPage) Database.getBufferPool().getPage(tid, new HeapPageId(getId(), i), Permissions.READ_ONLY);
+            heapPage = (HeapPage) Database.getBufferPool().
+                    getPage(tid, new HeapPageId(getId(), i), Permissions.READ_ONLY);
             //判断page中是否有空slot可以插入tuple
             if (heapPage.getNumEmptySlots() > 0) {
                 break;
@@ -136,7 +137,8 @@ public class HeapFile implements DbFile {
             //写入磁盘
             writePage(heapPage);
         }
-        heapPage = (HeapPage) Database.getBufferPool().getPage(tid, new HeapPageId(getId(), i), Permissions.READ_WRITE);
+        heapPage = (HeapPage) Database.getBufferPool().
+                getPage(tid, new HeapPageId(getId(), i), Permissions.READ_WRITE);
         heapPage.insertTuple(t);
         heapPage.markDirty(true, tid);
         pages.add(heapPage);
