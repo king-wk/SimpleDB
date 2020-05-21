@@ -16,11 +16,12 @@ public class LockManager {
     private HashMap<PageId, Set<TransactionId>> sharers;
     //跟踪page上的排他锁
     private HashMap<PageId, TransactionId> owners;
+    //跟踪事务上的共享锁
     private HashMap<TransactionId, Set<PageId>> sharedPages;
+    //跟踪事务上的排他锁
     private HashMap<TransactionId, Set<PageId>> ownedPages;
     //跟踪page上正在等待的事务
     private HashMap<PageId, Set<TransactionId>> waiters;
-    private HashMap<TransactionId, Set<PageId>> waitedPages;
     //记录每个事务正在等待哪些事务的结束
     private HashMap<TransactionId, Set<TransactionId>> waitingInfo;
 
@@ -30,7 +31,6 @@ public class LockManager {
         sharedPages = new HashMap<TransactionId, Set<PageId>>();
         ownedPages = new HashMap<TransactionId, Set<PageId>>();
         waiters = new HashMap<PageId, Set<TransactionId>>();
-        waitedPages = new HashMap<TransactionId, Set<PageId>>();
         waitingInfo = new HashMap<TransactionId, Set<TransactionId>>();
     }
 
@@ -66,10 +66,11 @@ public class LockManager {
         } else {
             // 如果加锁申请失败
             addWaiter(tid, pid, perm);
+            // 遍历tid依赖的事务，看它们是否间接依赖tid
             Set<TransactionId> transactionId = waitingInfo.get(tid);
             for (TransactionId tid2 : transactionId) {
                 if (detectDeadLock(tid, tid2)) {
-                    waitingInfo.remove(tid);
+                    removeWaiter(tid, pid);
                     throw new TransactionAbortedException();
                 }
             }
@@ -115,9 +116,11 @@ public class LockManager {
         sharer.add(tid);
         sharers.put(pid, sharer);
         Set<PageId> sharedPage = sharedPages.get(tid);
+        // 如果事务tid还没有锁
         if (sharedPage == null) {
             sharedPage = new HashSet<>();
         }
+        // tid添加一把共享锁
         sharedPage.add(pid);
         sharedPages.put(tid, sharedPage);
     }
@@ -131,9 +134,11 @@ public class LockManager {
     private void addOwner(TransactionId tid, PageId pid) {
         owners.put(pid, tid);
         Set<PageId> ownedPage = ownedPages.get(tid);
+        // 如果事务tid还没有排他锁
         if (ownedPage == null) {
             ownedPage = new HashSet<>();
         }
+        // 事务tid添加一把排他锁
         ownedPage.add(pid);
         ownedPages.put(tid, ownedPage);
     }
@@ -152,12 +157,6 @@ public class LockManager {
         }
         waiter.add(tid);
         waiters.put(pid, waiter);
-        Set<PageId> waitedPage = waitedPages.get(tid);
-        if (waitedPage == null) {
-            waitedPage = new HashSet<>();
-        }
-        waitedPage.add(pid);
-        waitedPages.put(tid, waitedPage);
         Set<TransactionId> waiting = waitingInfo.get(tid);
         if (waiting == null) {
             waiting = new HashSet<>();
@@ -196,8 +195,11 @@ public class LockManager {
         }
         Set<PageId> sharedPage = sharedPages.get(tid);
         if (sharedPage != null) {
+            //删除tid上pid的共享锁
             sharedPage.remove(pid);
             if (sharedPage.size() == 0) {
+                //如果删除tid对pid的共享锁之后，tid没有共享锁了
+                //在hashmap上删除这个tid
                 sharedPages.remove(tid);
             } else {
                 sharedPages.put(tid, sharedPage);
@@ -215,8 +217,11 @@ public class LockManager {
         owners.remove(pid);
         Set<PageId> ownedPage = ownedPages.get(tid);
         if (ownedPage != null) {
+            //删除tid上pid的排他锁
             ownedPage.remove(pid);
             if (ownedPage.size() == 0) {
+                //如果删除tid对pid的排他锁之后，tid没有排他锁了
+                //在hashmap上删除这个tid
                 ownedPages.remove(tid);
             } else {
                 ownedPages.put(tid, ownedPage);
@@ -230,7 +235,7 @@ public class LockManager {
      * @param tid the ID of the specified transaction
      * @param pid the ID of the specified page
      */
-    private void removeWaiter(TransactionId tid, PageId pid) {
+    public void removeWaiter(TransactionId tid, PageId pid) {
         Set<TransactionId> waiter = waiters.get(pid);
         if (waiter != null) {
             waiter.remove(tid);
@@ -240,15 +245,7 @@ public class LockManager {
                 waiters.put(pid, waiter);
             }
         }
-        Set<PageId> waitedPage = waitedPages.get(tid);
-        if (waitedPage != null) {
-            waitedPage.remove(pid);
-            if (waitedPage.size() == 0) {
-                waitedPages.remove(tid);
-            } else {
-                waitedPages.put(tid, waitedPage);
-            }
-        }
+        // 删除tid的等待序列
         waitingInfo.remove(tid);
     }
 
@@ -329,6 +326,9 @@ public class LockManager {
     public synchronized void releaseAllLocks(TransactionId tid) {
         if (sharedPages.get(tid) != null) {
             for (PageId pid : sharedPages.get(tid)) {
+                // 遍历所有有tid的共享锁的page
+                // 然后将page上tid的共享锁remove
+                // 这里不能调用removeSharer(),否则回修改sharedPages抛出异常
                 Set<TransactionId> sharer = sharers.get(pid);
                 sharer.remove(tid);
                 if (sharer.size() == 0) {
@@ -337,6 +337,7 @@ public class LockManager {
                     sharers.put(pid, sharer);
                 }
             }
+            // 删除tid的所有共享锁后，最后删除tid即可
             sharedPages.remove(tid);
         }
         if (ownedPages.get(tid) != null) {
@@ -363,12 +364,15 @@ public class LockManager {
      */
     public synchronized boolean detectDeadLock(TransactionId tid1, TransactionId tid2) {
         if (tid1.equals(tid2)) {
+            // 如果tid2和tid1相等，说明tid1间接依赖本身的结束
             return true;
         } else {
             Set<TransactionId> tid = waitingInfo.get(tid2);
             if (tid == null) {
                 return false;
             } else {
+                // 递归
+                // 遍历tid2的所有等待的事务，如果它们间接等待tid1则说明发生了死锁
                 for (TransactionId t : tid) {
                     if (detectDeadLock(tid1, t)) {
                         return true;

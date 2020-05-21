@@ -38,7 +38,6 @@ public class BufferPool {
     //页的最大数量
     private int MAX_Page;
     private LockManager lockManager;
-    private static final int WAIT_TIME = 10;
 
     /**
      * Creates a BufferPool that caches up to numPages pages.
@@ -85,7 +84,15 @@ public class BufferPool {
         // some code goes here
         boolean state = lockManager.acquireLock(tid, pid, perm);
         // 如果申请加锁失败
+        long start = System.currentTimeMillis();
         while (!state) {
+            long end = System.currentTimeMillis();
+            // 如果申请时间超过2秒
+            if (end - start > 2000) {
+                // 删除tid事务的申请，中止tid事务
+                lockManager.removeWaiter(tid, pid);
+                throw new TransactionAbortedException();
+            }
             try {
                 // 每隔10毫秒申请一次，直到申请成功
                 Thread.sleep(10);
